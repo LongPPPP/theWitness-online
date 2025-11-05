@@ -1,0 +1,52 @@
+
+.theme {
+    --line-primary: #8FF;
+    --line-secondary: #FF2;
+
+    .theme-light {
+        --background: #0A8;
+        --outer-background: #113833;
+        --foreground: #344;
+        --border: #000;
+        --line-default: #AAA;
+        --line-success: #FFF;
+        --line-fail: #000;
+        --cursor: #FFF;
+        --text-color: #000;
+        --page-background: #FFF;
+        --alt-background: #EEE;
+        --active-color: #DDD;
+    }
+
+    .theme-dark {
+        --background: #221;
+        --outer-background: #070704;
+        --foreground: #751;
+        --border: #666;
+        --line-default: #888;
+        --line-success: #BBB;
+        --line-fail: #000;
+        --cursor: #FFF;
+        --text-color: #AAA;
+        --page-background: #000;
+        --alt-background: #333;
+        --active-color: #555;
+    }
+
+}
+
+/* test only */
+.rotator-1 {
+    width: 200px;
+    height: 200px;
+    background: rgba(255, 0, 0, 0.5);
+    animation: rotate 1s linear infinite;
+}
+
+@keyframes rotate {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+
+
