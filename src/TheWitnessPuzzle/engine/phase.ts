@@ -65,7 +65,6 @@ function phaseCell(decoration: number): GridCell {
 function phasePath(decoration: number): LineCell {
     const color: string = phaseColor(decoration & 0xF);
     const path: number = (decoration & ~0XF);
-    console.info(path.toString(16));
 
     switch (path) {
         case Decoration.Shape.Gap_Row:
@@ -86,20 +85,19 @@ function phasePath(decoration: number): LineCell {
  * 转换generator中的panel (16进制表示每一格子是什么) 为puzzle
  * */
 export function phasePuzzle(_panel: Panel) {
-    const x = Math.trunc((_panel.Height - 1) / 2);
-    const y = Math.trunc((_panel.Width - 1) / 2);
-    const puzzle = new Puzzle(x, y);
+    const height = Math.trunc((_panel.Height - 1) / 2);
+    const width = Math.trunc((_panel.Width - 1) / 2);
+    const puzzle = new Puzzle(width, height);
     const grid = _panel.Grid;
-    logHexMatrix(grid)
 
     for (let row = 0; row < grid.length; row++) {
         for (let col = 0; col < grid[row].length; col++) {
             const decoration = grid[row][col];
 
             if ((row & 1) && (col & 1)) {
-                puzzle.setCell(col, row, phaseCell(decoration))
+                puzzle.setCell(row, col, phaseCell(decoration))
             } else {
-                puzzle.setCell(col, row, phasePath(decoration))
+                puzzle.setCell(row, col, phasePath(decoration))
             }
 
         }
@@ -108,11 +106,12 @@ export function phasePuzzle(_panel: Panel) {
     // draw start
     const starts = _panel.Startpoints;
     for (const start of starts) {
-        puzzle.markStart(start.second, start.first);
+        puzzle.markStart(start.first, start.second);
     }
 
     // draw end
     const ends = _panel.Endpoints;
+    console.warn(ends[0])
     for (const end of ends) {
         const dir = end.GetDir()
         let dirs: EndDirection = "top"
@@ -128,7 +127,7 @@ export function phasePuzzle(_panel: Panel) {
             console.warn("Unknown Direction " + dir)
         }
 
-        puzzle.markEnd(end.GetX(), end.GetY(), dirs);
+        puzzle.markEnd(end.GetX(),end.GetY() , dirs);
     }
     return puzzle
 }
