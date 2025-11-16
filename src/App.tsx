@@ -1,6 +1,8 @@
 import "./App.css"
-import {TheWitnessPuzzle} from "./TheWitnessPuzzle/TheWitnessPuzzle.tsx";
-// import Demo from "./assets/Demo.tsx";
+import BrowserSupportChecker from "./BrowserSupportChecker.tsx";
+import Challenge from "./Challenge.tsx";
+import TheWitnessPuzzle from "./TheWitnessPuzzle/TheWitnessPuzzle.tsx";
+import {Decoration} from "./TheWitnessPuzzle/engine/generator/Panel.ts";
 
 const consoleError = console.error;
 const consoleWarn = console.warn
@@ -54,13 +56,37 @@ function setLogLevel(level) {
     if (level === 'spam') return
 }
 
-setLogLevel('info')
+setLogLevel('log')
+
+// const symbols = [
+//     Decoration.Shape.Exit, 1,
+//     Decoration.Shape.Stone | Decoration.Color.Black, 3,
+//     Decoration.Shape.Stone | Decoration.Color.White, 5,
+//     Decoration.Shape.Stone | Decoration.Color.Green, 4,
+//     Decoration.Shape.Gap, 5,
+//     Decoration.Shape.Start, 1
+// ]
+
+const symbols = [
+    Decoration.Shape.Exit, 1,
+    Decoration.Shape.Poly, 2,
+    Decoration.Shape.Gap, 7,
+    Decoration.Shape.Start, 1
+]
 
 function App() {
     return (
         <div>
-            <TheWitnessPuzzle theme={"theme-light"}/>
-            <script type="text/javascript" src="assets/temp/validate.js"></script>
+            <BrowserSupportChecker/>
+            {/*<Challenge/>*/}
+            <TheWitnessPuzzle
+                theme={"theme-light"}
+                width={3}
+                height={4}
+                symbols={symbols}
+                // seed = {'c=*@Zvzx97z655z'}
+                // seed = {'x'}
+            />
         </div>
     )
 }

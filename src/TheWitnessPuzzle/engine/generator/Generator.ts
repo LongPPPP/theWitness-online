@@ -4,6 +4,8 @@ import {KeyValuePair} from "./utils/KeyValuePair.ts";
 import {Random} from "./utils/Random.ts";
 import {SortedSet} from "./utils/SortedSet.ts";
 
+type Shape = SortedSet<Point>;
+
 export class Generator {
     // ========================================
     // Public Properties & Fields
@@ -458,16 +460,16 @@ export class Generator {
             }
         } else this._path = this.customPath;
 
-        const solution = Array<string>(); //For debugging only
-        for (let y = 0; y < this._panel.Height; y++) {
-            const row = new Array<string>();
-            for (let x = 0; x < this._panel.Width; x++) {
-                if (this.get(x, y) === IntersectionFlags.PATH) {
-                    row.push("xx");
-                } else row.push("  ");
-            }
-            solution.push(row.toString());
-        }
+        // const solution = Array<string>(); //For debugging only
+        // for (let y = 0; y < this._panel.Height; y++) {
+        //     const row = new Array<string>();
+        //     for (let x = 0; x < this._panel.Width; x++) {
+        //         if (this.get(x, y) === IntersectionFlags.PATH) {
+        //             row.push("xx");
+        //         } else row.push("  ");
+        //     }
+        //     solution.push(row.toString());
+        // }
         // console.debug(solution)
         //Attempt to add the symbols
         if (!this.place_all_symbols(symbols)) //TODO:关键函数
@@ -1109,6 +1111,334 @@ export class Generator {
     }
 
     /**
+     * Generate a random shape.
+     * @param region the region of points to choose from; points chosen will be removed
+     * @param bufferRegion points that may be chosen twice due to overlapping shapes; points will be removed from here before points in region
+     * @param pos
+     * @param maxSize the maximum size of the generated shape. Whether the points can be contiguous or not is determined by local variable _SHAPEDIRECTIONS
+     */
+    private generate_shape(region: SortedSet<Point>, bufferRegion: SortedSet<Point>, pos: Point, maxSize: number): Shape
+    private generate_shape(region: SortedSet<Point>, pos: Point, maxSize: number): Shape
+    private generate_shape(region: SortedSet<Point>, arg2: SortedSet<Point> | Point, arg3: Point | number, arg4?: number): Shape {
+        let bufferRegion: SortedSet<Point>;
+        let pos: Point;
+        let maxSize: number;
+        if (arg2 instanceof Point) {
+            bufferRegion = new SortedSet<Point>()
+            pos = arg2 as Point
+            maxSize = arg3 as number
+        } else {
+            bufferRegion = arg2
+            pos = arg3 as Point;
+            maxSize = arg4!
+        }
+
+        const shape: Shape = new SortedSet<Point>();
+        shape.Add(pos);
+        if (!bufferRegion.Remove(pos))
+            region.Remove(pos);
+        while (shape.Count < maxSize && region.Count > 0) {
+            pos = this.pick_random(shape);
+            let i = 0;
+            for (; i < 10; i++) {
+                const dir = this.pick_random(Generator._SHAPEDIRECTIONS);
+                const p = Point.add(pos, dir);
+                if (region.Contains(p) && !shape.Contains(p)) {
+                    shape.Add(p);
+                    if (!bufferRegion.Remove(p))
+                        region.Remove(p);
+                    break;
+                }
+            }
+            if (i == 10)
+                return shape;
+        }
+        return shape;
+    }
+
+    /**
+     * Get the integer representing the shape, accounting for whether it is rotated or negative. -1 rotation means a random rotation, depth is for controlling recursion and should be set to 0
+     **/
+    private make_shape_symbol(shape: Shape, rotated: boolean, negative: boolean): number
+    private make_shape_symbol(shape: Shape, rotated: boolean, negative: boolean, rotation: number, depth: number): number
+    private make_shape_symbol(shape: Shape, rotated: boolean, negative: boolean, rotation: number = -1, depth: number = 0): number {
+        let symbol = Decoration.Shape.Poly;
+        if (rotated) {
+            if (rotation == -1) {
+                if (this.make_shape_symbol(shape, rotated, negative, 0, depth + 1) == this.make_shape_symbol(shape, rotated, negative, 1, depth + 1))
+                    return 0; //Check to make sure the shape is not the same when rotated
+                rotation = this._random.Next(4);
+            }
+            symbol |= Decoration.Shape.Can_Rotate;
+            const newShape: Shape = new SortedSet<Point>(); //Rotate shape points according to rotation
+            for (const p of shape) {
+                switch (rotation) {
+                    case 0:
+                        newShape.Add(p);
+                        break;
+                    case 1:
+                        newShape.Add(new Point(p.second, -p.first));
+                        break;
+                    case 2:
+                        newShape.Add(new Point(-p.second, p.first));
+                        break;
+                    case 3:
+                        newShape.Add(new Point(-p.first, -p.second));
+                        break;
+                }
+            }
+            shape = newShape;
+        }
+        if (negative) symbol |= Decoration.Shape.Negative;
+        let xmin = 2147483647, xmax = -2147483648, ymin = 2147483647, ymax = -2147483648;
+        for (const p of shape) {
+            if (p.first < xmin) xmin = p.first;
+            if (p.first > xmax) xmax = p.first;
+            if (p.second < ymin) ymin = p.second;
+            if (p.second > ymax) ymax = p.second;
+        }
+        if (xmax - xmin > 6 || ymax - ymin > 6) { //Shapes cannot be more than 4 in width and height
+            if (Point.pillarWidth == 0 || ymax - ymin > 6 || depth > Math.trunc(Point.pillarWidth / 2)) return 0;
+            const newShape = new SortedSet<Point>();
+            for (const p of shape) newShape.Add(new Point((p.first - xmax + Point.pillarWidth) % Point.pillarWidth, p.second));
+            return this.make_shape_symbol(newShape, rotated, negative, rotation, depth + 1);
+        }
+        //Translate to the corner and set bit flags (16 bits, 1 where a shape block is present)
+        for (const p of shape) {
+            symbol |= (1 << (Math.trunc((p.first - xmin) / 2) + (ymax - p.second) * 2)) << 16;
+        }
+        if (this._random.Next(4) > 0) { //The generator makes a certain type of symbol way too often (2x2 square with another square attached), this makes it much less frequent
+            const type = symbol >> 16;
+            if (type == 0x0331 || type == 0x0332 || type == 0x0037 || type == 0x0067 || type == 0x0133 || type == 0x0233 || type == 0x0073 || type == 0x0076)
+                return 0;
+        }
+        return symbol;
+    }
+
+    /**
+     * Place the given amount of shapes with random colors selected from the color vectors.
+     * @param colors colors for regular shapes
+     * @param negativeColors colors for negative shapes
+     * @param amount how many normal shapes
+     * @param numRotated how many rotated shapes
+     * @param numNegative how many negative shapes
+     */
+    private place_shapes(colors: number[], negativeColors: number[], amount: number, numRotated: number, numNegative: number): boolean {
+        const open = new SortedSet<Point>(this._openpos);
+        const shapeSize = this.hasFlag(Config.SmallShapes) ? 2 : this.hasFlag(Config.BigShapes) ? amount === 1 ? 8 : 6 : 4;
+        let targetArea = Math.trunc(amount * shapeSize * 7 / 8); //Average size must be at least 7/8 of the target size
+        if (amount * shapeSize > this._panel.get_num_grid_blocks()) targetArea = this._panel.get_num_grid_blocks();
+        const originalAmount = amount;
+        if (this.hasFlag(Config.MountainFloorH) && this._panel.Width === 9) { //The 4 small puzzles shape size may vary depending on the path
+            targetArea = 0;
+            this.removeFlag(Config.MountainFloorH);
+        }
+        let totalArea = 0;
+        let minx = this._panel.Width, miny = this._panel.Height, maxx = 0, maxy = 0;
+        let colorIndex = this._random.Next() % colors.length;
+        let colorIndexN = this._random.Next() % (negativeColors.length + 1);
+        let shapesCanceled = false, shapesCombined = false, flatShapes = true;
+        if (amount === 1) shapesCombined = true;
+        while (amount > 0) {
+            if (open.Count === 0)
+                return false;
+            let pos = this.pick_random(open);
+            const region = this.get_region(pos);
+            const bufferRegion = new SortedSet<Point>();
+            const open2 = new SortedSet<Point>(); //Open points for just that region
+            for (const p of region) {
+                if (open.Remove(p)) open2.Add(p);
+            }
+            if (region.Count + totalArea === this._panel.get_num_grid_blocks() &&
+                targetArea !== this._panel.get_num_grid_blocks()) continue; //To prevent shapes from filling every grid point
+            let shapes: Shape[] = [];
+            let shapesN: Shape[] = [];
+            let numShapesN = Math.min(this._random.Next() % (numNegative + 1), Math.trunc((region.Count) / 3)); //Negative blocks may be at max 1/3 of the regular blocks
+            if (amount === 1) numShapesN = numNegative;
+            if (numShapesN !== 0) {
+                const regionN = new SortedSet<Point>(this._gridpos);
+                let maxSize = (region.Count) - numShapesN * 3; //Max size of negative shapes
+                if (maxSize === 0) maxSize = 1;
+                for (let i = 0; i < numShapesN; i++) {
+                    let pos = this.pick_random(region);
+                    //Try to pick a random point adjacent to a shape
+                    for (let j = 0; j < 10; j++) {
+                        const p = Point.add(pos, this.pick_random(Generator._SHAPEDIRECTIONS));
+                        if (regionN.Contains(p) && !region.Contains(p)) {
+                            pos = p;
+                            break;
+                        }
+                    }
+                    if (!regionN.Contains(pos)) return false;
+                    const shape: Shape = this.generate_shape(regionN, pos, Math.min(this._random.Next(3) + 1, maxSize));
+                    shapesN.push(shape);
+                    for (const p of shape) {
+                        if (region.Contains(p)) bufferRegion.Add(p); //Buffer region stores overlap between shapes
+                        else region.Add(p);
+                    }
+                }
+            }
+            let numShapes = Math.trunc((region.Count + bufferRegion.Count) / (shapeSize + 1)) + 1; //Pick a number of shapes to make. I tried different ones until I found something that made a good variety of shapes
+            if (numShapes === 1 && bufferRegion.Count > 0) numShapes++; //If there is any overlap, we need at least two shapes
+            if (numShapes < amount && region.Count > shapeSize && this._random.Next(2) === 1) numShapes++; //Adds more variation to the shape sizes
+            if (region.Count <= shapeSize + 1 && bufferRegion.Count === 0 && this._random.Next(2) === 1) numShapes = 1; //For more variation, sometimes make a bigger shape than the target if the size is close
+            if (this.hasFlag(Config.MountainFloorH)) {
+                if (region.Count < 19) continue;
+                numShapes = 6; //The big mountain floor puzzle on hard mode needs additional shapes since some combine
+                targetArea = 19;
+            }
+            if (this.hasFlag(Config.SplitShapes) && numShapes !== 1) continue;
+            if (this.hasFlag(Config.RequireCombineShapes) && numShapes === 1) continue;
+            let balance = false;
+            if (numShapes > amount //The region is too big for the number of shapes chosen
+                || numNegative > 0 && this._panel.ID === 0x288AA //Expert UTM Perspective 4
+                || numNegative > 0 && this._panel.ID === 0x00089) { //Expert UTM Invisible 6
+                if (numNegative < 2 || this.hasFlag(Config.DisableCancelShapes)) continue;
+                //Make balancing shapes - Positive and negative will be switched so that code can be reused
+                balance = true;
+                const regionN = new SortedSet<Point>(this._gridpos);
+                numShapes = Math.max(2, this._random.Next() % numNegative + 1);          //Actually the negative shapes
+                numShapesN = Math.min(amount, 1);       //Actually the positive shapes
+                if (numShapesN >= numShapes * 3 || numShapesN * 5 <= numShapes) continue;
+                shapes = [];
+                shapesN = [];
+                region.Clear();
+                bufferRegion.Clear();
+                for (let i = 0; i < numShapesN; i++) {
+                    const shape: Shape = this.generate_shape(regionN, this.pick_random(regionN), Math.min(shapeSize + 1, Math.trunc(numShapes * 2 / numShapesN) + this._random.Next(3) - 1));
+                    shapesN.push(shape);
+                    for (const p of shape) {
+                        region.Add(p);
+                    }
+                }
+                shapesCanceled = true;
+                //Let the rest of the algorithm create the cancelling shapes
+            }
+            if (this._panel.symmetry !== 0 && numShapes === originalAmount && numShapes >= 3 && Point.pillarWidth === 0 && !region.Contains(new Point(Math.trunc(this._panel.Width / 4) * 2 + 1, Math.trunc(this._panel.Height / 4) * 2 + 1)))
+                continue; //Prevent it from shoving all shapes to one side of symmetry
+            if ((this._panel.symmetry === Panel.Symmetry.ParallelH || this._panel.symmetry === Panel.Symmetry.ParallelV ||
+                    this._panel.symmetry === Panel.Symmetry.ParallelHFlip || this._panel.symmetry === Panel.Symmetry.ParallelVFlip)
+                && region.Contains(new Point(Math.trunc(this._panel.Width / 4) * 2 + 1, Math.trunc(this._panel.Height / 4) * 2 + 1)))
+                continue; //Prevent parallel symmetry from making regions through the center line (this tends to make the puzzles way too hard)
+            if (!balance && numShapesN !== 0 && (numShapesN > 1 && numRotated > 0 || numShapesN > 2 || numShapes + numShapesN > 6))
+                continue; //Trying to prevent the game's shape calculator from lagging too much
+            if (!(this.hasFlag(Config.MountainFloorH) && this._panel.Width === 11) && open2.Count < numShapes + numShapesN) continue; //Not enough space to put the symbols
+            if (numShapes === 1) {
+                shapes.push(new SortedSet<Point>(region));
+                region.Clear();
+            } else for (; numShapes > 0; numShapes--) {
+                if (region.Count === 0) break;
+                const shape: Shape = this.generate_shape(region, bufferRegion, this.pick_random(region), balance ? this._random.Next(3) + 1 : shapeSize);
+                if (!balance && numShapesN !== 0) for (const s of shapesN) if (shape.SetEquals(s)) return false; //Prevent unintentional in-group canceling
+                shapes.push(shape);
+            }
+            //Take remaining area and try to stick it to existing shapes
+            multibreak:
+                while (region.Count > 0) {
+                    pos = this.pick_random(region);
+                    for (const shape of shapes) {
+                        if (shape.Count > shapeSize || shape.Contains(pos)) continue;
+                        for (const p of shape) {
+                            for (const dir of Generator._DIRECTIONS2) {
+                                if (Point.add(pos, dir).equals(p)) {
+                                    shape.Add(pos);
+                                    if (!bufferRegion.Remove(pos))
+                                        region.Remove(pos);
+                                    break multibreak;
+                                }
+                            }
+                        }
+                    }
+                    //Failed to cover entire region, need to pick a different region
+                    break;
+                }
+            if (region.Count > 0) continue;
+            if (balance) { //Undo swap for balancing shapes
+                [shapes, shapesN] = [shapesN, shapes];
+            }
+            numShapes = shapes.length;
+            for (const shape of shapesN) {
+                shapes.push(shape);
+            }
+            if (this.hasFlag(Config.DisconnectShapes)) {
+                //Make sure at least one shape is disconnected
+                let disconnect = false;
+                for (const shape of shapes) {
+                    if (shape.Count === 1) continue;
+                    disconnect = true;
+                    for (const p of shape) {
+                        for (const dir of Generator._DIRECTIONS2) {
+                            if (shape.Contains(Point.add(p, dir))) {
+                                disconnect = false;
+                                break;
+                            }
+                        }
+                        if (!disconnect) break;
+                    }
+                    if (disconnect) break;
+                }
+                if (!disconnect) continue;
+            }
+            if (numShapes > 1) shapesCombined = true;
+            numNegative -= shapesN.length;
+            if (this.hasFlag(Config.MountainFloorH) && amount === 6) { //For mountain floor, combine some of the shapes together
+                if (!this.combine_shapes(shapes) || !this.combine_shapes(shapes)) //Must call this twice b/c there are two combined areas
+                    return false;
+                amount -= 2;
+            }
+            for (const shape of shapes) {
+                const symbol = this.make_shape_symbol(shape, (numRotated-- > 0), (numShapes-- <= 0));
+                if (symbol === 0)
+                    return false;
+                if (!((symbol >> 16) === 0x000F || (symbol >> 16) === 0x1111))
+                    flatShapes = false;
+                //Attempt not to put shape symbols adjacent
+                let pos2 = new Point();
+                for (let i = 0; i < 10; i++) {
+                    if (open2.Count === 0) return false;
+                    pos2 = this.pick_random(open2);
+                    let pass = true;
+                    for (const dir of Generator._8DIRECTIONS2) {
+                        const p = Point.add(pos2, dir);
+                        if (!this.off_edge(p) && ((this.get(p) & (Decoration.Shape.Poly)) !== 0)) {
+                            pass = false;
+                            break;
+                        }
+                    }
+                    if (pass) break;
+                }
+                if ((symbol & Decoration.Shape.Negative) !== 0) this.set(pos2, symbol | negativeColors[(colorIndexN++) % negativeColors.length]);
+                else {
+                    this.set(pos2, symbol | colors[(colorIndex++) % colors.length]);
+                    totalArea += shape.Count;
+                    amount--;
+                }
+                open2.Remove(pos2);
+                this._openpos.Remove(pos2);
+                if (this._panel.symmetry !== 0 && Point.pillarWidth === 0 && originalAmount >= 3) {
+                    for (const p of shape) {
+                        if (p.first < minx) minx = p.first;
+                        if (p.second < miny) miny = p.second;
+                        if (p.first > maxx) maxx = p.first;
+                        if (p.second > maxy) maxy = p.second;
+                    }
+                }
+            }
+
+        } //Do some final checks - make sure targetArea has been reached, all shapes have been placed, and that config requirements have been met
+        if (totalArea < targetArea || numNegative > 0 ||
+            this.hasFlag(Config.RequireCancelShapes) && !shapesCanceled ||
+            this.hasFlag(Config.RequireCombineShapes) && !shapesCombined ||
+            originalAmount > 1 && flatShapes)
+            return false;
+        //If symmetry, make sure it didn't shove all the shapes to one side
+        if (this._panel.symmetry !== 0 && Point.pillarWidth === 0 && originalAmount >= 3 &&
+            (minx >= Math.trunc(this._panel.Width / 2) || maxx <= Math.trunc(this._panel.Width / 2) || miny >= Math.trunc(this._panel.Height / 2) || maxy <= Math.trunc(this._panel.Height / 2)))
+            return false;
+        return true;
+    }
+
+    /**
      * Check if a gap can be placed at pos.
      */
     private can_place_gap(pos: Point): boolean {
@@ -1176,8 +1506,8 @@ export class Generator {
         let count = 0;
         for (const p of region) {
             const sym = this.get(p);
-            if (sym != 0 && (sym & 0xf) == color)
-                if (count++ == 2) return count;
+            if (sym !== 0 && (sym & 0xf) === color)
+                if (count++ === 2) return count;
         }
         return count;
     }
@@ -1188,7 +1518,7 @@ export class Generator {
     private place_stars(color: number, amount: number): boolean {
         const open = new SortedSet<Point>(this._openpos);
         while (amount > 0) {
-            if (open.Count == 0)
+            if (open.Count === 0)
                 return false;
             let pos = this.pick_random(open);
             const region = this.get_region(pos);
@@ -1199,13 +1529,13 @@ export class Generator {
             const count = this.count_color(region, color);
             if (count >= 2) continue; //Too many of that color
             if (open2.Count + count < 2) continue; //Not enough space to get 2 of that color
-            if (count == 0 && amount == 1) continue; //If one star is left, it needs a pair
+            if (count === 0 && amount === 1) continue; //If one star is left, it needs a pair
             this.set(pos, Decoration.Shape.Star | color);
             this._openpos.Remove(pos);
             amount--;
-            if (count == 0) { //Add a second star of the same color
+            if (count === 0) { //Add a second star of the same color
                 open2.Remove(pos);
-                if (open2.Count == 0)
+                if (open2.Count === 0)
                     return false;
                 pos = this.pick_random(open2);
                 this.set(pos, Decoration.Shape.Star | color);
@@ -1221,7 +1551,7 @@ export class Generator {
      * @param targetCount how many triangles are in the symbol, 0 for random
      * */
     private place_triangles(color: number, amount: number, targetCount: number): boolean {
-        if (this._panel.ID == 0x033EA) { //Keep Yellow Pressure Plate
+        if (this._panel.ID === 0x033EA) { //Keep Yellow Pressure Plate
             const count = this.count_sides(new Point(1, 3));
             this.set(new Point(1, 3), Decoration.Shape.Triangle | color | (count << 16));
             this._openpos.Remove(new Point(1, 3));
@@ -1229,16 +1559,16 @@ export class Generator {
         const open = new SortedSet<Point>(this._openpos);
         let count1 = 0, count2 = 0, count3 = 0;
         while (amount > 0) {
-            if (open.Count == 0)
+            if (open.Count === 0)
                 return false;
             const pos = this.pick_random(open);
             const count = this.count_sides(pos);
             open.Remove(pos);
-            if (this._panel.symmetry != 0) {
+            if (this._panel.symmetry !== 0) {
                 open.Remove(this.get_sym_point(pos));
             }
-            if (count == 0 || targetCount != 0 && count != targetCount) continue;
-            if (this.hasFlag(Config.TreehouseLayout) || this._panel.ID == 0x289E7) { //If the block is adjacent to a start or exit, don't place a triangle there
+            if (count === 0 || targetCount !== 0 && count !== targetCount) continue;
+            if (this.hasFlag(Config.TreehouseLayout) || this._panel.ID === 0x289E7) { //If the block is adjacent to a start or exit, don't place a triangle there
                 let found = false;
                 for (const dir of Generator._DIRECTIONS1) {
                     if (this._starts.Contains(Point.add(pos, dir)) || this._exits.Contains(Point.add(pos, dir))) {
@@ -1248,16 +1578,16 @@ export class Generator {
                 }
                 if (found) continue;
             }
-            if (count == 1) {
-                if (targetCount == 0 && count1 * 2 > count2 + count3 && this._random.Next(2) == 0) continue;
+            if (count === 1) {
+                if (targetCount === 0 && count1 * 2 > count2 + count3 && this._random.Next(2) === 0) continue;
                 count1++;
             }
-            if (count == 2) {
-                if (targetCount == 0 && count2 * 2 > count1 + count3 && this._random.Next(2) % 2 == 0) continue;
+            if (count === 2) {
+                if (targetCount === 0 && count2 * 2 > count1 + count3 && this._random.Next(2) % 2 === 0) continue;
                 count2++;
             }
-            if (count == 3) {
-                if (targetCount == 0 && count3 * 2 > count1 + count2 && this._random.Next(2) % 2 == 0) continue;
+            if (count === 3) {
+                if (targetCount === 0 && count3 * 2 > count1 + count2 && this._random.Next(2) % 2 === 0) continue;
                 count3++;
             }
             this.set(pos, Decoration.Shape.Triangle | color | (count << 16));
@@ -1274,11 +1604,62 @@ export class Generator {
         let count = 0;
         for (const dir of Generator._DIRECTIONS1) {
             const p = Point.add(pos, dir);
-            if (!this.off_edge(p) && this.get(p) == IntersectionFlags.PATH) {
+            if (!this.off_edge(p) && this.get(p) === IntersectionFlags.PATH) {
                 count++;
             }
         }
         return count;
+    }
+
+    private combine_shapes(shapes: Shape[]): boolean {
+        for (let i = 0; i < shapes.length; i++) {
+            for (let j = 0; j < shapes.length; j++) {
+                if (i === j) continue;
+                if (shapes[i].Count + shapes[j].Count <= 5) continue;
+                if (shapes[i].Count > 5 || shapes[j].Count > 5) continue;
+                //Look for adjacent points
+                for (const p1 of shapes[i]) {
+                    for (const p2 of shapes[j]) {
+                        for (const dir of Generator._DIRECTIONS2) {
+                            if (Point.add(p1, dir).equals(p2)) {
+                                //Combine shapes
+                                for (const p of shapes[i]) shapes[j].Add(p);
+                                //Make sure there are no holes
+                                const area = new SortedSet<Point>(this._gridpos);
+                                for (const p of shapes[j]) area.Remove(p);
+                                while (area.Count > 0) {
+                                    const region = new SortedSet<Point>();
+                                    const check: Point[] = [];
+                                    check.push(area.First());
+                                    region.Add(area.First());
+                                    while (check.length > 0) {
+                                        const p: Point = check.pop(); //TODO: 检查正确性
+                                        for (const dir_ of Generator._DIRECTIONS1) {
+                                            const p2_ = Point.add(p, Point.multiply(dir_, 2));
+                                            if (area.Contains(p2_) && region.Add(p2_)) {
+                                                check.push(p2_);
+                                            }
+                                        }
+                                    }
+                                    let connected = false;
+                                    for (const p of region) {
+                                        if (p.first === 1 || p.second === 1 || p.first === this._panel.Width - 2 || p.second === this._panel.Height - 2) {
+                                            connected = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!connected) return false;
+                                    for (const p of region) area.Remove(p);
+                                }
+                                shapes.splice(i,1);
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     // =============================================
@@ -1458,6 +1839,7 @@ export enum Config {
     MountainFloorH = 0x80000000
 }
 
+// TODO 添加tetris和cancel符号
 
 
 

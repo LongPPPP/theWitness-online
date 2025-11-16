@@ -1,9 +1,10 @@
 export interface Config {
-    theme: 'theme-light' | 'theme-dark',
+    // theme: 'theme-light' | 'theme-dark',
     volume: number,
     sensitivity: number,
-    allowEndHints: boolean,
+    enableEndHints: boolean,
     wittleTracing: boolean,
+    onSuccess: (x: number, y: number) => void,
 }
 
 export default class ConfigService {

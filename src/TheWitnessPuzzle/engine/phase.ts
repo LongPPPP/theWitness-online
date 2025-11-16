@@ -41,6 +41,39 @@ function phaseCell(decoration: number): GridCell {
     const color: string = phaseColor(decoration & 0xF);
     const shape: number = (decoration & ~0XF);
 
+    if ((decoration & 0x0400) === Decoration.Shape.Poly) {
+        let poly = decoration >> 16;
+        let newPoly = 0; // 存储最终变换结果
+        const array: number[][] = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]];
+
+        // 遍历4x4网格的所有16个bit（位置0~15）
+        for (let pos = 0; pos < 16; pos++) {
+            array[pos % 4][3 - Math.trunc(pos / 4)] = (poly & 1);
+            poly = poly >> 1;
+        }
+        // console.info("==============对角线反转前==============")
+        // const beforeCopy = array.map(row => [...row]);
+        // console.info(beforeCopy,(decoration >> 16).toString(16));
+
+        // 对角线反转
+        for (let i = 0; i < 4; i++) {
+            for (let j = i + 1; j < 4; j++) {
+                // 交换 array[i][j] 和 array[j][i]
+                [array[i][j], array[j][i]] = [array[j][i], array[i][j]];
+            }
+        }
+        // console.info("==============对角线反转后==============")
+        // console.info(array,(decoration >> 16).toString(16))
+
+        // 转换为puzzle的格式
+        for (let j=3;j>=0;j--) {
+            const col = array[0][j] | (array[1][j] << 1) | (array[2][j] << 2) | (array[3][j] << 3);
+            newPoly = (newPoly << 4) | col;
+        }
+
+        return {type: 'poly', polyshape: newPoly, color: "#fff"}
+    }
+
     switch (shape) {
         case Decoration.Shape.Stone:
             return {type: 'square', color: color};
@@ -89,7 +122,10 @@ export function phasePuzzle(_panel: Panel) {
     const width = Math.trunc((_panel.Width - 1) / 2);
     const puzzle = new Puzzle(width, height);
     const grid = _panel.Grid;
+    // logHexMatrix(grid)
+    // console.info(puzzle.grid)
 
+    // 旋转输出?
     for (let row = 0; row < grid.length; row++) {
         for (let col = 0; col < grid[row].length; col++) {
             const decoration = grid[row][col];
@@ -111,7 +147,6 @@ export function phasePuzzle(_panel: Panel) {
 
     // draw end
     const ends = _panel.Endpoints;
-    console.warn(ends[0])
     for (const end of ends) {
         const dir = end.GetDir()
         let dirs: EndDirection = "top"
@@ -127,7 +162,7 @@ export function phasePuzzle(_panel: Panel) {
             console.warn("Unknown Direction " + dir)
         }
 
-        puzzle.markEnd(end.GetX(),end.GetY() , dirs);
+        puzzle.markEnd(end.GetX(), end.GetY(), dirs);
     }
     return puzzle
 }

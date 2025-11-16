@@ -269,7 +269,7 @@ export function placeYlops(ylops: PolyCell[], i: number, polys: PolyCell[], puzz
     return false
 }
 
-// Returns whether or not a set of polyominos fit into a region.
+// Returns whether a set of polyominos fit into a region.
 // Solves via recursive backtracking: Some piece must fill the top left square,
 // so try every piece to fill it, then recurse.
 export function placePolys(polys: PolyCell[], puzzle: Puzzle) {
@@ -280,11 +280,11 @@ export function placePolys(polys: PolyCell[], puzzle: Puzzle) {
     for (x = 0; x < puzzle.width; x++) {
         for (y = 0; y < puzzle.height; y++) {
             const cell = puzzle.maskGrid[x][y];
-            if ((cell || 0) > 0) {
+            if (cell > 0 && (x&1) && (y&1)) { //TODO: 这里经过了修改
                 console.log('Cell', x, y, 'has been overfilled and no ylops left to place')
                 return false
             }
-            if (allPolysPlaced && (cell || 0) < 0 && x % 2 === 1 && y % 2 === 1) {
+            if (allPolysPlaced && cell < 0 && x % 2 === 1 && y % 2 === 1) {
                 // Normal, center cell with a negative value & no polys remaining.
                 console.log('All polys placed, but grid not full')
                 return false

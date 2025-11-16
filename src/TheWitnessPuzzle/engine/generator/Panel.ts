@@ -612,7 +612,6 @@ export class Panel {
     }
 
 }
-
 export namespace Panel {
     export enum Symmetry { //NOTE - Not all of these are valid symmetries for certain puzzles
         None, Horizontal, Vertical, Rotational,

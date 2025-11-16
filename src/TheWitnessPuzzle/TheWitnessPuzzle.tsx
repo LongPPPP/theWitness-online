@@ -1,82 +1,112 @@
-import ConfigService, {type Config} from "./config.ts";
+import ConfigService from "./config.ts";
 import {useEffect, useRef} from "react";
 import {Generator} from "./engine/generator/Generator.ts";
-import {Decoration, Panel} from "./engine/generator/Panel.ts";
+import {Panel} from "./engine/generator/Panel.ts";
 import {phasePuzzle} from "./engine/phase.ts";
 import {draw} from "./engine/puzzle/display2.ts";
 import styles from "./style/Puzzle.module.css";
 import "./style/animations.css";
+import Puzzle from "./engine/puzzle/puzzle.ts";
+import PuzzleSolver from "./engine/puzzle/solve.ts";
 
-interface Props extends Config {
-
+interface Props {
+    width: number;
+    height: number;
+    startPoints?: Array<{ x: number; y: number }>;
+    endPoints?: Array<{ x: number; y: number; dir: "left" | "right" | "top" | "bottom" }>
+    symbols?: number[];
+    seed?: string;
+    theme?: 'theme-light' | 'theme-dark',
+    volume?: number,
+    sensitivity?: number,
+    enableEndHints?: boolean,
+    outerBackgroundColor?: string,
+    backgroundColor?: string,
+    onSuccess?: (x: number, y: number) => void,
 }
 
-export function TheWitnessPuzzle(
+
+export default function TheWitnessPuzzle(
     {
+        width,
+        height,
+        startPoints = [],
+        endPoints = [],
+        symbols,
+        seed,
+        outerBackgroundColor,
+        backgroundColor,
         theme = 'theme-light',
         volume = 1,
         sensitivity = 0.7,
-        allowEndHints = true,
+        enableEndHints = true,
+        onSuccess = () => {
+        },
     }: Props) {
+    const themeRef = useRef<HTMLDivElement>(null);
     const puzzleRef = useRef<SVGSVGElement>(null)
     const generator = useRef<Generator>(null)
     const panel = useRef<Panel>(null)
+    const puzzle = useRef<Puzzle>(null)
     const generatorWorker = useRef<Worker>(null)
 
     ConfigService.getInstance().setConfig({
         volume,
-        theme,
         sensitivity,
-        allowEndHints,
+        enableEndHints,
         wittleTracing: true,
+        onSuccess,
     });
 
-    // init worker
+    // init components
     useEffect(() => {
-        generatorWorker.current = new Worker(new URL('./engine/generator/generator.worker.ts', import.meta.url),
-            {type: 'module'});
+        if (outerBackgroundColor != undefined) themeRef.current.style.setProperty('--outer-background', outerBackgroundColor)
+        if (backgroundColor != undefined) themeRef.current.style.setProperty('--background', backgroundColor)
 
-        generatorWorker.current.postMessage({
-            type: 'new Generator',
-            args: ['bbc'],
-        })
-    }, [])
+        puzzleRef.current.innerHTML = " "
+        const puzzle = new Puzzle(width, height);
 
-    // if worker is not supported, then use generator in main process
-    useEffect(() => {
-        generator.current = new Generator('bbc');
-        panel.current = new Panel(0x018AF, 9, 11, 0, 6, 6, 0)
-    }, []);
-
-    function test() {
-        if (puzzleRef.current) {
-            puzzleRef.current.innerHTML = " "
-            generator.current.setGridSize(4, 5);
-            console.time("suspectFunction");
-            generator.current.generate(panel.current, Decoration.Shape.Exit, 1, Decoration.Shape.Stone | Decoration.Color.Black, 3, Decoration.Shape.Stone | Decoration.Color.White, 5, Decoration.Shape.Stone | Decoration.Color.Green, 4, Decoration.Shape.Gap, 5, Decoration.Shape.Start, 1);
-            console.timeEnd("suspectFunction");
-            const puzzle = phasePuzzle(panel.current)
-            draw(puzzle)
-
+        for (const start of startPoints) {
+            puzzle.markStart(start.x, start.y);
         }
-    }
 
-    function test2() {
-        if (puzzleRef.current) {
+        for (const end of endPoints) {
+            puzzle.markEnd(end.x, end.y, end.dir);
+        }
 
-            // generatorWorker.current.postMessage({
-            //     type: 'new Generator',
-            //     args: ['bbc'],
-            // })
+        draw(puzzle)
+
+    }, [backgroundColor, endPoints, height, outerBackgroundColor, startPoints, width]);
+
+    // init worker / if worker is not supported, then use generator in main process
+    useEffect(() => {
+        if (typeof window !== 'undefined' && 'Worker' in window) {
+            generatorWorker.current = new Worker(new URL('./engine/generator/generator.worker.ts', import.meta.url),
+                {type: 'module'});
 
             generatorWorker.current.postMessage({
+                type: 'new Generator',
+                args: seed,
+            })
+        } else {
+            generator.current = new Generator(seed);
+        }
+    }, [])
+
+    // handle generate
+    useEffect(() => {
+        if (symbols.length > 18) {
+            console.error("the num of symbols cannot more than 9")
+        }
+        if (generatorWorker.current != undefined) {
+            generatorWorker.current.postMessage({
                 type: 'setGridSize',
-                args: [4, 4],
+                args: [width, height],
             })
 
             generatorWorker.current.postMessage({
                 type: "generate",
-                args: [Decoration.Shape.Exit, 1, Decoration.Shape.Stone | Decoration.Color.Black, 3, Decoration.Shape.Stone | Decoration.Color.White, 5, Decoration.Shape.Stone | Decoration.Color.Green, 4, Decoration.Shape.Gap, 5, Decoration.Shape.Start, 1]
+                args: symbols
             })
 
             generatorWorker.current.onmessage = (event) => {
@@ -85,26 +115,48 @@ export function TheWitnessPuzzle(
                 } else if (event.data.type === "success") {
                     puzzleRef.current.innerHTML = " "
                     panel.current = Panel.ObjectToPanel(event.data.panel);
-                    const puzzle = phasePuzzle(panel.current)
-                    draw(puzzle)
+                    puzzle.current = phasePuzzle(panel.current)
+                    draw(puzzle.current)
                 }
             }
+        } else {
+            panel.current = new Panel(0x018AF, width, height, 0, 0, 0, 0)
+            puzzleRef.current.innerHTML = " "
+            generator.current.setGridSize(width, height);
+            console.time("suspectFunction");
+            generator.current.generate(panel.current, symbols[0], symbols[1], symbols[2], symbols[3], symbols[4], symbols[5], symbols[6], symbols[7], symbols[8], symbols[9], symbols[10], symbols[11], symbols[12], symbols[13], symbols[14], symbols[15], symbols[16], symbols[17]);
+            console.timeEnd("suspectFunction");
+            puzzle.current = phasePuzzle(panel.current)
+            draw(puzzle.current)
+        }
+
+    }, [width, height, symbols]);
+
+    function autoSolve() {
+        if(puzzle.current) {
+            const puzzle_1 = puzzle.current;
+
+            const puzzleSolver = new PuzzleSolver(puzzle_1)
+            const f1 = () => {}
+            const f2 = () => {}
+            const solution = puzzleSolver.solve(f1,f2)[0];
+            PuzzleSolver.drawPath(puzzle_1, solution,puzzleRef.current);
+            generatorWorker.current.postMessage({
+                type: 'getPath'
+            })
         }
     }
 
+
     return (
-        <>
-            <div className={styles.theme}
-                 style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh'}}>
-                <div className={styles[ConfigService.getInstance().Config.theme]}>
-                    <div className="q">
-                        <svg ref={puzzleRef} id="puzzle"></svg>
-                    </div>
+        <div className={styles.theme}
+             style={{display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
+            <div ref={themeRef} className={styles[theme]}>
+                <div className="q">
+                    <svg ref={puzzleRef} id="puzzle"></svg>
                 </div>
-                <button onClick={test}>NEXT</button>
-                <button onClick={test2}>NEXT2</button>
             </div>
-            {/*<div className={"rotator-1 "}></div>*/}
-        </>
+            <button onClick={autoSolve}>CLICK</button>
+        </div>
     )
 }

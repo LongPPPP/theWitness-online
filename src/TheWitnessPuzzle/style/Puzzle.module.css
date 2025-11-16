@@ -32,21 +32,8 @@
         --alt-background: #333;
         --active-color: #555;
     }
-
 }
 
-/* test only */
-.rotator-1 {
-    width: 200px;
-    height: 200px;
-    background: rgba(255, 0, 0, 0.5);
-    animation: rotate 1s linear infinite;
-}
-
-@keyframes rotate {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
 
 
 

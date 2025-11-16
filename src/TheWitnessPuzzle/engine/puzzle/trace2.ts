@@ -498,6 +498,7 @@ export function trace(event: MouseEvent | TouchEvent, puzzle: Puzzle, pos: {
                     rawPath.push(0)
 
                     // if (window.TRACE_COMPLETION_FUNC) window.TRACE_COMPLETION_FUNC(puzzle, rawPath)
+                    ConfigService.getInstance().Config.onSuccess(data.pos.x, data.pos.y)
                 } else {
                     Utils.PLAY_SOUND('fail')
                     data.animations.insertRule('.' + data.svg.id + ' {animation: 1s 1 forwards line-fail !important}\n')
@@ -548,7 +549,7 @@ export function onTraceStart(puzzle: Puzzle, pos: {
     svg.insertBefore(cursor, svg.getElementById('cursorPos'))
 
     // endpoints animations
-    if (ConfigService.getInstance().Config.allowEndHints) {
+    if (ConfigService.getInstance().Config.enableEndHints) {
         const ends = Array.from(svg.querySelectorAll(`[id^="end_${svg.id}"]`)) as SVGElement[];
         for (let i = 0; i < ends.length; i++) {
             const cx = ends[i].getAttribute('cx')

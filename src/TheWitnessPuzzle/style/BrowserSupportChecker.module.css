@@ -1,0 +1,30 @@
+.wrapper {
+    max-width: 600px;
+    margin: 20px auto;
+    /*padding: 20px;*/
+    /*border: 1px solid #e0e0e0;*/
+    /*border-radius: 8px;*/
+
+    .support-box {
+        margin-bottom: 12px;
+        border: 1px solid #e0e0e0;
+        border-radius: 16px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+
+        p{
+            span {
+                margin-left: 8px;
+                color: #666;
+                font-size: 0.9em;
+            }
+        }
+
+        .warning {
+            color: #F44336;
+            margin: 4px 0 0 24px;
+            font-size: 0.9em;
+        }
+    }
+}
+
+
