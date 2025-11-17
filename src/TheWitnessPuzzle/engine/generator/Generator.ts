@@ -489,7 +489,7 @@ export class Generator {
         for (const s of symbols.getSymbols(Decoration.Shape.Eraser)) {
             for (let i = 0; i < s.Value; i++) {
                 eraserColors.push(s.Key & 0xf);
-                eraseSymbols.push(this.hasFlag(Config.FalseParity) ? Decoration.Shape.Dot_Intersection : symbols.popRandomSymbol());
+                eraseSymbols.push(this.hasFlag(Config.FalseParity) ? Decoration.Shape.Dot_Intersection : symbols.popRandomSymbol(this._random));
             }
         }
 
@@ -511,7 +511,7 @@ export class Generator {
                 }
             }
         }
-        if (numShapes > 0 && !this.place_shapes(colors, negativeColors, numShapes, numRotate, numNegative) || numShapes == 0 && numNegative > 0)
+        if (numShapes > 0 && !this.place_shapes(colors, negativeColors, numShapes, numRotate, numNegative) || numShapes === 0 && numNegative > 0)
             return false;
 
         this._stoneTypes = symbols.getSymbols(Decoration.Shape.Stone).length;
@@ -524,10 +524,10 @@ export class Generator {
         //     return false;
         for (const s of symbols.getSymbols(Decoration.Shape.Star)) if (!this.place_stars(s.Key & 0xf, s.Value))
             return false;
-        // if (symbols.style == Panel.Styles.HAS_STARS && this.hasFlag(Config.TreehouseLayout) && !this.checkStarZigzag(this._panel))
+        // if (symbols.style === Panel.Styles.HAS_STARS && this.hasFlag(Config.TreehouseLayout) && !this.checkStarZigzag(this._panel))
         //     return false;
-        // if (eraserColors.length > 0 && !this.place_erasers(eraserColors, eraseSymbols))
-        //     return false;
+        if (eraserColors.length > 0 && !this.place_erasers(eraserColors, eraseSymbols))
+            return false;
         for (const s of symbols.getSymbols(Decoration.Shape.Dot)) if (!this.place_dots(s.Value, (s.Key & 0xf), (s.Key & ~0xf) === Decoration.Shape.Dot_Intersection))
             return false;
         for (const s of symbols.getSymbols(Decoration.Shape.Gap)) if (!this.place_gaps(s.Value))
@@ -1150,7 +1150,7 @@ export class Generator {
                     break;
                 }
             }
-            if (i == 10)
+            if (i === 10)
                 return shape;
         }
         return shape;
@@ -1164,8 +1164,8 @@ export class Generator {
     private make_shape_symbol(shape: Shape, rotated: boolean, negative: boolean, rotation: number = -1, depth: number = 0): number {
         let symbol = Decoration.Shape.Poly;
         if (rotated) {
-            if (rotation == -1) {
-                if (this.make_shape_symbol(shape, rotated, negative, 0, depth + 1) == this.make_shape_symbol(shape, rotated, negative, 1, depth + 1))
+            if (rotation === -1) {
+                if (this.make_shape_symbol(shape, rotated, negative, 0, depth + 1) === this.make_shape_symbol(shape, rotated, negative, 1, depth + 1))
                     return 0; //Check to make sure the shape is not the same when rotated
                 rotation = this._random.Next(4);
             }
@@ -1198,7 +1198,7 @@ export class Generator {
             if (p.second > ymax) ymax = p.second;
         }
         if (xmax - xmin > 6 || ymax - ymin > 6) { //Shapes cannot be more than 4 in width and height
-            if (Point.pillarWidth == 0 || ymax - ymin > 6 || depth > Math.trunc(Point.pillarWidth / 2)) return 0;
+            if (Point.pillarWidth === 0 || ymax - ymin > 6 || depth > Math.trunc(Point.pillarWidth / 2)) return 0;
             const newShape = new SortedSet<Point>();
             for (const p of shape) newShape.Add(new Point((p.first - xmax + Point.pillarWidth) % Point.pillarWidth, p.second));
             return this.make_shape_symbol(newShape, rotated, negative, rotation, depth + 1);
@@ -1209,7 +1209,7 @@ export class Generator {
         }
         if (this._random.Next(4) > 0) { //The generator makes a certain type of symbol way too often (2x2 square with another square attached), this makes it much less frequent
             const type = symbol >> 16;
-            if (type == 0x0331 || type == 0x0332 || type == 0x0037 || type == 0x0067 || type == 0x0133 || type == 0x0233 || type == 0x0073 || type == 0x0076)
+            if (type === 0x0331 || type === 0x0332 || type === 0x0037 || type === 0x0067 || type === 0x0133 || type === 0x0233 || type === 0x0073 || type === 0x0076)
                 return 0;
         }
         return symbol;
@@ -1611,6 +1611,140 @@ export class Generator {
         return count;
     }
 
+    /**
+     * Place the given amount of erasers with the given colors.
+     * @param eraseSymbols the symbols that were erased
+     */
+    private place_erasers(colors: number[], eraseSymbols: number[]): boolean {
+        const open = new SortedSet<Point>(this._openpos);
+        if (this._panel.ID === 0x288FC && this.hasFlag(Config.DisableWrite)) open.Remove(new Point(5, 5)); //For the puzzle in the cave with a pillar in middle
+        let amount = colors.length;
+        while (amount > 0) {
+            if (open.Count === 0)
+                return false;
+            let toErase = eraseSymbols[amount - 1];
+            const color = colors[amount - 1];
+            let pos = this.pick_random(open);
+            const region: SortedSet<Point> = this.get_region(pos);
+            let open2: SortedSet<Point> = new SortedSet<Point>();
+            for (const p of region) {
+                if (open.Remove(p)) open2.Add(p);
+            }
+            if (this._splitPoints.length > 0) { //Make sure this is one of the split point regions
+                let found = false;
+                for (const p of this._splitPoints) {
+                    if (region.Contains(p)) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) continue;
+            }
+            if (this._panel.ID === 0x288FC && this.hasFlag(Config.DisableWrite) && !region.Contains(new Point(5, 5))) continue; //For the puzzle in the cave with a pillar in middle
+            if (this.hasFlag(Config.MakeStonesUnsolvable)) {
+                const valid = new SortedSet<Point>();
+                for (const p of open2) {
+                    //Try to make a checkerboard pattern with the stones
+                    // if (!this.off_edge(p + new Point(2, 2)) && this.get(p + new Point(2, 2)) === toErase && this.get(p + new Point(0, 2)) !== 0 && this.get(p + new Point(0, 2)) !== toErase && this.get(p + new Point(2, 0)) !== 0 && this.get(p + new Point(2, 0)) !== toErase ||
+                    //     !this.off_edge(p + new Point(-2, 2)) && this.get(p + new Point(-2, 2)) === toErase && this.get(p + new Point(0, 2)) !== 0 && this.get(p + new Point(0, 2)) !== toErase && this.get(p + new Point(-2, 0)) !== 0 && this.get(p + new Point(-2, 0)) !== toErase ||
+                    //     !this.off_edge(p + new Point(2, -2)) && this.get(p + new Point(2, -2)) === toErase && this.get(p + new Point(0, -2)) !== 0 && this.get(p + new Point(0, -2)) !== toErase && this.get(p + new Point(2, 0)) !== 0 && this.get(p + new Point(2, 0)) !== toErase ||
+                    //     !this.off_edge(p + new Point(-2, -2)) && this.get(p + new Point(-2, -2)) === toErase && this.get(p + new Point(0, -2)) !== 0 && this.get(p + new Point(0, -2)) !== toErase && this.get(p + new Point(-2, 0)) !== 0 && this.get(p + new Point(-2, 0)) !== toErase)
+                    //     valid.Add(p);
+                    if (!this.off_edge(Point.add(p, new Point(2, 2))) && this.get(Point.add(p, new Point(2, 2))) === toErase && this.get(Point.add(p, new Point(0, 2))) !== 0 && this.get(Point.add(p, new Point(0, 2))) !== toErase && this.get(Point.add(p, new Point(2, 0))) !== 0 && this.get(Point.add(p, new Point(2, 0))) !== toErase ||
+                        !this.off_edge(Point.add(p, new Point(-2, 2))) && this.get(Point.add(p, new Point(-2, 2))) === toErase && this.get(Point.add(p, new Point(0, 2))) !== 0 && this.get(Point.add(p, new Point(0, 2))) !== toErase && this.get(Point.add(p, new Point(-2, 0))) !== 0 && this.get(Point.add(p, new Point(-2, 0))) !== toErase ||
+                        !this.off_edge(Point.add(p, new Point(2, -2))) && this.get(Point.add(p, new Point(2, -2))) === toErase && this.get(Point.add(p, new Point(0, -2))) !== 0 && this.get(Point.add(p, new Point(0, -2))) !== toErase && this.get(Point.add(p, new Point(2, 0))) !== 0 && this.get(Point.add(p, new Point(2, 0))) !== toErase ||
+                        !this.off_edge(Point.add(p, new Point(-2, -2))) && this.get(Point.add(p, new Point(-2, -2))) === toErase && this.get(Point.add(p, new Point(0, -2))) !== 0 && this.get(Point.add(p, new Point(0, -2))) !== toErase && this.get(Point.add(p, new Point(-2, 0))) !== 0 && this.get(Point.add(p, new Point(-2, 0))) !== toErase)
+                        valid.Add(p);
+                }
+                open2 = valid;
+            }
+            if ((open2.Count === 0 || this._splitPoints.length === 0 && open2.Count === 1) && (toErase & Decoration.Shape.Dot) === 0) continue;
+            let canPlace = false;
+            if (this.get_symbol_type(toErase) === Decoration.Shape.Stone) {
+                canPlace = !this.can_place_stone(region, (toErase & 0xf));
+            } else if (this.get_symbol_type(toErase) === Decoration.Shape.Star) {
+                canPlace = (this.count_color(region, (toErase & 0xf)) + (color === (toErase & 0xf) ? 1 : 0) !== 1);
+            } else canPlace = true;
+            if (!canPlace) continue;
+
+            if (this.get_symbol_type(toErase) === Decoration.Shape.Stone || this.get_symbol_type(toErase) === Decoration.Shape.Star) {
+                this.set(pos, toErase);
+            } else if ((toErase & Decoration.Shape.Dot) !== 0) { //Find an open edge to put the dot on
+                const openEdge = new SortedSet<Point>();
+                for (const p of region) {
+                    for (const dir of Generator._8DIRECTIONS1) {
+                        if (toErase === Decoration.Shape.Dot_Intersection && (dir.first === 0 || dir.second === 0)) continue;
+                        const p2 = Point.add(p, dir);
+                        if (this.get(p2) === 0 && (this.hasFlag(Config.FalseParity) || this.can_place_dot(p2, false))) {
+                            openEdge.Add(p2);
+                        }
+                    }
+                }
+                if (openEdge.Count === 0)
+                    continue;
+                pos = this.pick_random(openEdge);
+                toErase &= ~IntersectionFlags.INTERSECTION;
+                if ((toErase & 0xf) === Decoration.Color.Blue || (toErase & 0xf) === Decoration.Color.Cyan) toErase |= IntersectionFlags.DOT_IS_BLUE;
+                if ((toErase & 0xf) === Decoration.Color.Yellow || (toErase & 0xf) === Decoration.Color.Orange) toErase |= IntersectionFlags.DOT_IS_ORANGE;
+                toErase &= ~0x4000f; //Take away extra flags from the symbol
+                if ((pos.first & 1) === 0 && (pos.second & 1) === 0) toErase |= Decoration.Shape.Dot_Intersection;
+                else if ((pos.second & 1) === 0) toErase |= Decoration.Shape.Dot_Row;
+                this.set(pos, ((pos.first & 1) === 1 ? Decoration.Shape.Dot_Row : (pos.second & 1) === 1 ? Decoration.Shape.Dot_Column : Decoration.Shape.Dot_Intersection) | (toErase & 0xffff));
+            } else if (this.get_symbol_type(toErase) === Decoration.Shape.Poly) {
+                let symbol = 0; //Make a random shape to cancel
+                while (symbol === 0) {
+                    const area = new SortedSet<Point>(this._gridpos);
+                    let shapeSize: number;
+                    if ((toErase & Decoration.Shape.Negative) !== 0 || this.hasFlag(Config.SmallShapes)) shapeSize = this._random.Next(3) + 1;
+                    else {
+                        shapeSize = this._random.Next(5) + 1;
+                        if (shapeSize < 3)
+                            shapeSize += this._random.Next(3);
+                    }
+                    const shape: Shape = this.generate_shape(area, this.pick_random(area), shapeSize);
+                    if (shape.Count === region.Count) continue; //Don't allow the shape to match the region, to guarantee it will be wrong
+                    symbol = this.make_shape_symbol(shape, (toErase & Decoration.Shape.Can_Rotate) !== 0, (toErase & Decoration.Shape.Negative) !== 0);
+                }
+                this.set(pos, symbol | (toErase & 0xf));
+            } else if (this.get_symbol_type(toErase) === Decoration.Shape.Triangle) {
+                if (this.hasFlag(Config.TreehouseLayout) || this._panel.ID === 0x289E7) { //If the block is adjacent to a start or exit, don't place a triangle there
+                    let found = false;
+                    for (const dir of Generator._DIRECTIONS1) {
+                        if (this._starts.Contains(Point.add(pos, dir)) || this._exits.Contains(Point.add(pos, dir))) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found) continue;
+                }
+                let count = this.count_sides(pos);
+                if (count === 0) count = this._random.Next(3) + 1;
+                else count = (count + (this._random.Next() & 1)) % 3 + 1;
+                this.set(pos, toErase | (count << 16));
+            }
+
+            if ((toErase & Decoration.Shape.Dot) === 0) {
+                this._openpos.Remove(pos);
+                open2.Remove(pos);
+            }
+            //Place the eraser at a random open point
+            if (this._splitPoints.length === 0) pos = this.pick_random(open2);
+            else for (const p of this._splitPoints) if (region.Contains(p)) {
+                pos = p;
+                break;
+            }
+            if (this._panel.ID === 0x288FC && this.hasFlag(Config.DisableWrite)) {
+                if (this.get(5, 5) !== 0) return false;
+                pos = new Point(5, 5)
+                ; //For the puzzle in the cave with a pillar in middle
+            }
+            this.set(pos, Decoration.Shape.Eraser | color);
+            this._openpos.Remove(pos);
+            amount--;
+        }
+        return true;
+    }
+
     private combine_shapes(shapes: Shape[]): boolean {
         for (let i = 0; i < shapes.length; i++) {
             for (let j = 0; j < shapes.length; j++) {
@@ -1651,7 +1785,7 @@ export class Generator {
                                     if (!connected) return false;
                                     for (const p of region) area.Remove(p);
                                 }
-                                shapes.splice(i,1);
+                                shapes.splice(i, 1);
                                 return true;
                             }
                         }

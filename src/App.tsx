@@ -1,6 +1,5 @@
 import "./App.css"
 import BrowserSupportChecker from "./BrowserSupportChecker.tsx";
-import Challenge from "./Challenge.tsx";
 import TheWitnessPuzzle from "./TheWitnessPuzzle/TheWitnessPuzzle.tsx";
 import {Decoration} from "./TheWitnessPuzzle/engine/generator/Panel.ts";
 
@@ -56,7 +55,7 @@ function setLogLevel(level) {
     if (level === 'spam') return
 }
 
-setLogLevel('log')
+setLogLevel('info')
 
 // const symbols = [
 //     Decoration.Shape.Exit, 1,
@@ -74,6 +73,20 @@ const symbols = [
     Decoration.Shape.Start, 1
 ]
 
+const symbols1 = [
+    Decoration.Shape.Poly, 1,
+    Decoration.Shape.Poly | Decoration.Shape.Can_Rotate, 1,
+    Decoration.Shape.Stone | Decoration.Color.Black, 3,
+    Decoration.Shape.Stone | Decoration.Color.White, 3
+]
+
+const symbols2 = [
+    Decoration.Shape.Stone | Decoration.Color.Black, 3,
+    Decoration.Shape.Stone | Decoration.Color.White, 2,
+    Decoration.Shape.Triangle | Decoration.Color.Orange, 5,
+    Decoration.Shape.Eraser | Decoration.Color.White, 1
+];
+
 function App() {
     return (
         <div>
@@ -81,9 +94,9 @@ function App() {
             {/*<Challenge/>*/}
             <TheWitnessPuzzle
                 theme={"theme-light"}
-                width={3}
+                width={4}
                 height={4}
-                symbols={symbols}
+                symbols={symbols2}
                 // seed = {'c=*@Zvzx97z655z'}
                 // seed = {'x'}
             />

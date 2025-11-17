@@ -1,5 +1,3 @@
-import ConfigService from "../../config.ts";
-
 const soundTracks = {
     'start': new Audio('src/assets/sound/panel_start_tracing.aac'),
     'success': new Audio('src/assets/sound/panel_success.aac'),
@@ -8,19 +6,20 @@ const soundTracks = {
 }
 
 let currentAudio = null
-export function PLAY_SOUND(name:'start' | 'success' | 'fail' | 'abort'): void {
+
+export function PLAY_SOUND(name: 'start' | 'success' | 'fail' | 'abort', volume: number): void {
     if (currentAudio) currentAudio.pause()
     const audio = soundTracks[name]
     audio.load()
-    audio.volume = parseFloat(String(ConfigService.getInstance().Config.volume))
-    audio.play().then(function() {
+    audio.volume = volume
+    audio.play().then(function () {
         currentAudio = audio
-    }).catch(function() {
+    }).catch(function () {
         // Do nothing.
     })
 }
 
-export function deleteElementsByClassName(rootElem:Element, className:string) {
+export function deleteElementsByClassName(rootElem: Element, className: string) {
     let elems: HTMLCollectionOf<Element>;
     while (true) {
         elems = rootElem.getElementsByClassName(className)

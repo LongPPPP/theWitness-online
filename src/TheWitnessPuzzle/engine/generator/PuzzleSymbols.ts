@@ -1,6 +1,5 @@
 import {SortedDictionary} from "./utils/SortedDictionary.ts";
 import {Decoration, Panel} from "./Panel.ts";
-import {Random} from "./utils/Random.ts";
 import {KeyValuePair} from "./utils/KeyValuePair.ts";
 
 export class PuzzleSymbols {
@@ -51,22 +50,22 @@ export class PuzzleSymbols {
         return this.symbols.getElementByKey(symbolType).length > 0;
     }
 
-    public popRandomSymbol() {
-        throw Error("Not support yet (popRandomSymbol)");
+    public popRandomSymbol(random) {
+        // throw Error("Not support yet (popRandomSymbol)");
         const types: Array<number> = [];
         for (const pair of this.symbols) {
             if (pair[1].length > 0 && pair[0] != Decoration.Shape.Start && pair[0] != Decoration.Shape.Exit && pair[0] != Decoration.Shape.Gap && pair[0] != Decoration.Shape.Eraser) {
                 types.push(pair[0]);
             }
         }
-        const random = new Random();
+        // const random = new Random();
         let randType = types[random.Next(types.length)];
         let randIndex = random.Next(this.symbols.getElementByKey(randType).length);
-        while (this.symbols[randType][randIndex].Value == 0 || this.symbols[randType][randIndex].Value >= 25) {
+        while (this.symbols.getElementByKey(randType)[randIndex].Value == 0 || this.symbols.getElementByKey(randType)[randIndex].Value >= 25) {
             randType = types[random.Next(types.length)];
             randIndex = random.Next(this.symbols[randType].Count);
         }
-        this.symbols[randType][randIndex] = new KeyValuePair<number, number>(this.symbols[randType][randIndex].Key, this.symbols[randType][randIndex].Value - 1);
-        return this.symbols[randType][randIndex].Key;
+        this.symbols.getElementByKey(randType)[randIndex] = new KeyValuePair<number, number>(this.symbols.getElementByKey(randType)[randIndex].Key, this.symbols.getElementByKey(randType)[randIndex].Value - 1);
+        return this.symbols.getElementByKey(randType)[randIndex].Key;
     }
 }

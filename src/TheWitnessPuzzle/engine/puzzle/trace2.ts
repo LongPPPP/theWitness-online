@@ -2,12 +2,12 @@ import type Puzzle from "./puzzle.ts";
 import {createElement} from "./svg.ts";
 import {GAP_BREAK, GAP_FULL, LINE_BLACK, LINE_BLUE, LINE_NONE, LINE_YELLOW} from "./constants.ts"
 import * as Utils from "./utils.ts"
-import ConfigService from "../../config.ts";
 import {validate} from "./validate.ts";
 import type {Cell, LineCell} from "./cell.ts";
 
 type DataRecord = {
     tracing?: boolean;
+    wittleTracing?: boolean;
     svg?: SVGSVGElement;
     cursor?: HTMLElement | SVGElement | null;
     x?: number;
@@ -392,7 +392,7 @@ function clamp(value: number, min: number, max: number) {
 export function onMove(dx: number, dy: number) {
     let collidedWith: string;
     {
-        if (ConfigService.getInstance().Config.wittleTracing === true) {
+        if (data.wittleTracing === true) {
             // Also handles some collision
             collidedWith = pushCursorWittle(dx, dy);
             console.debug('Collided with', collidedWith)
@@ -458,13 +458,14 @@ export function trace(event: MouseEvent | TouchEvent, puzzle: Puzzle, pos: {
     if (start != null && data.tracing !== true) { // data.tracing could be undefined or false
         const svg = start.parentElement as unknown as SVGSVGElement;
         data.tracing = true
-        Utils.PLAY_SOUND('start')
+        data.wittleTracing = puzzle.config.wittleTracing
+        Utils.PLAY_SOUND('start', puzzle.config.volume)
         // Cleans drawn lines & puzzle state
         clearGrid(svg, puzzle)
         onTraceStart(puzzle, pos, svg, start, symStart)
         data.animations.insertRule('.' + svg.id + '.start {animation: 150ms 1 forwards start-grow}\n')
 
-        hookMovementEvents(start)
+        hookMovementEvents(start, puzzle.config.sensitivity)
     } else {
         event.stopPropagation()
         // Signal the onMouseMove to stop accepting input (race condition)
@@ -485,7 +486,7 @@ export function trace(event: MouseEvent | TouchEvent, puzzle: Puzzle, pos: {
                 }
 
                 if (puzzleData.valid()) {
-                    Utils.PLAY_SOUND('success')
+                    Utils.PLAY_SOUND('success', puzzle.config.volume)
                     // !important to override the child animation
                     data.animations.insertRule('.' + data.svg.id + ' {animation: 1s 1 forwards line-success !important}\n')
 
@@ -498,9 +499,9 @@ export function trace(event: MouseEvent | TouchEvent, puzzle: Puzzle, pos: {
                     rawPath.push(0)
 
                     // if (window.TRACE_COMPLETION_FUNC) window.TRACE_COMPLETION_FUNC(puzzle, rawPath)
-                    ConfigService.getInstance().Config.onSuccess(data.pos.x, data.pos.y)
+                    puzzle.config.onSuccess(data.pos.x, data.pos.y)
                 } else {
-                    Utils.PLAY_SOUND('fail')
+                    Utils.PLAY_SOUND('fail', puzzle.config.volume)
                     data.animations.insertRule('.' + data.svg.id + ' {animation: 1s 1 forwards line-fail !important}\n')
                     // Get list of invalid elements
                     if (puzzle.settings.FLASH_FOR_ERRORS) {
@@ -513,13 +514,13 @@ export function trace(event: MouseEvent | TouchEvent, puzzle: Puzzle, pos: {
 
             // Right-clicked (or double-tapped) and not at the end: Clear puzzle
         } else if ((event as MouseEvent).button === 2 || (event as TouchEvent).touches.length > 1) {
-            Utils.PLAY_SOUND('abort')
+            Utils.PLAY_SOUND('abort', puzzle.config.volume)
             clearGrid(data.svg, puzzle)
         } else { // Exit lock but allow resuming from the cursor (Desktop only)
             data.cursor.onpointerdown = function () {
                 if ((start.parentElement as unknown as SVGSVGElement) !== data.svg) return // Another puzzle is live, so data is gone
                 data.tracing = true
-                hookMovementEvents(start)
+                hookMovementEvents(start, puzzle.config.sensitivity);
             }
         }
 
@@ -549,7 +550,7 @@ export function onTraceStart(puzzle: Puzzle, pos: {
     svg.insertBefore(cursor, svg.getElementById('cursorPos'))
 
     // endpoints animations
-    if (ConfigService.getInstance().Config.enableEndHints) {
+    if (puzzle.config.enableEndHints) {
         const ends = Array.from(svg.querySelectorAll(`[id^="end_${svg.id}"]`)) as SVGElement[];
         for (let i = 0; i < ends.length; i++) {
             const cx = ends[i].getAttribute('cx')
@@ -1082,9 +1083,9 @@ function push(dx: number, dy: number, dir: string, targetDir: 'left' | 'top' | '
     // Fraction of movement to redirect in the other direction
     let movementRatio = null;
     if (targetDir === 'left' || targetDir === 'top') {
-        movementRatio = ConfigService.getInstance().Config.wittleTracing === true ? -1 : -3
+        movementRatio = data.wittleTracing === true ? -1 : -3
     } else if (targetDir === 'right' || targetDir === 'bottom') {
-        movementRatio = ConfigService.getInstance().Config.wittleTracing === true ? 1 : 3
+        movementRatio = data.wittleTracing === true ? 1 : 3
     }
 
     let overshoot;
@@ -1147,12 +1148,12 @@ function clearGrid(svg: SVGSVGElement | Element, puzzle: Puzzle) {
 /**
  * 开始追踪鼠标并绘制线
  * */
-function hookMovementEvents(start: SVGElement) {
+function hookMovementEvents(start: SVGElement, sensitivity: number) {
     data.start = start
     if (start.requestPointerLock != null) start.requestPointerLock()
     // if (start.mozRequestPointerLock != null) start.mozRequestPointerLock() // 旧版浏览器适配
 
-    const sens = parseFloat(String(ConfigService.getInstance().Config.sensitivity));
+    const sens = sensitivity;
     document.onmousemove = function (event) {
         // Working around a race condition where movement events fire after the handler is removed.
         if (data.tracing !== true) return

@@ -1,7 +1,14 @@
 import {ROTATION_BIT} from "./polyominos.ts";
 import {DOT_BLACK, DOT_NONE, GAP_BREAK, GAP_FULL, LINE_NONE} from "./constants.ts";
-import type {Cell, EndDirection, DotType, GapType, GridCell, LineCell, LineType} from "./cell.ts";
+import type {Cell, DotType, EndDirection, GapType, GridCell, LineCell, LineType} from "./cell.ts";
 
+export type PuzzleConfig = {
+    volume: number,
+    sensitivity: number,
+    enableEndHints: boolean,
+    wittleTracing: boolean,
+    onSuccess: (x: number, y: number) => void,
+}
 
 // A 2x2 grid is internally a 5x5:
 // corner, edge, corner, edge, corner
@@ -29,6 +36,8 @@ export default class Puzzle {
     hasNegations: boolean;
     hasPolyominos: boolean;
 
+    // ==========================================
+    config: PuzzleConfig;
 
     constructor(width: number, height: number, pillar = false) {
         if (pillar) {
@@ -60,8 +69,8 @@ export default class Puzzle {
             // OUT_OF_BOUNDS_POLY: false,
         }
         // 初始化其他属性
-        this.startPoint = { x: 0, y: 0 };
-        this.endPoint = { x: 0, y: 0 };
+        this.startPoint = {x: 0, y: 0};
+        this.endPoint = {x: 0, y: 0};
         this.hasNegations = false;
         this.hasPolyominos = false;
     }
@@ -293,7 +302,7 @@ export default class Puzzle {
     /**
      * 标记起点（安全封装）
      */
-    markStart(x: number, y: number):boolean {
+    markStart(x: number, y: number): boolean {
         const cell = this.getLineCell(x, y)
         if (!cell) return false
         cell.start = true
@@ -302,7 +311,7 @@ export default class Puzzle {
     /**
      * 标记终点（安全封装）
      */
-    markEnd(x: number, y: number, dir: EndDirection):boolean {
+    markEnd(x: number, y: number, dir: EndDirection): boolean {
         const cell = this.getLineCell(x, y)
         if (!cell) return false
         cell.end = dir

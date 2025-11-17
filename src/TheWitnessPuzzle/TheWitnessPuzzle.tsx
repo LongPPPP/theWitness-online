@@ -1,12 +1,11 @@
-import ConfigService from "./config.ts";
-import {useEffect, useRef} from "react";
+import {useEffect, useId, useRef} from "react";
 import {Generator} from "./engine/generator/Generator.ts";
 import {Panel} from "./engine/generator/Panel.ts";
 import {phasePuzzle} from "./engine/phase.ts";
 import {draw} from "./engine/puzzle/display2.ts";
 import styles from "./style/Puzzle.module.css";
 import "./style/animations.css";
-import Puzzle from "./engine/puzzle/puzzle.ts";
+import Puzzle, {type PuzzleConfig} from "./engine/puzzle/puzzle.ts";
 import PuzzleSolver from "./engine/puzzle/solve.ts";
 
 interface Props {
@@ -43,20 +42,14 @@ export default function TheWitnessPuzzle(
         onSuccess = () => {
         },
     }: Props) {
-    const themeRef = useRef<HTMLDivElement>(null);
+    const uuid = "puzzle_" + useId()
+    const themeRef = useRef<HTMLDivElement>(null)
     const puzzleRef = useRef<SVGSVGElement>(null)
+    const generatorWorker = useRef<Worker>(null)
     const generator = useRef<Generator>(null)
     const panel = useRef<Panel>(null)
     const puzzle = useRef<Puzzle>(null)
-    const generatorWorker = useRef<Worker>(null)
-
-    ConfigService.getInstance().setConfig({
-        volume,
-        sensitivity,
-        enableEndHints,
-        wittleTracing: true,
-        onSuccess,
-    });
+    const puzzleConfig = useRef<PuzzleConfig>(null)
 
     // init components
     useEffect(() => {
@@ -74,9 +67,10 @@ export default function TheWitnessPuzzle(
             puzzle.markEnd(end.x, end.y, end.dir);
         }
 
-        draw(puzzle)
+        draw(puzzle, uuid)
+        puzzle.config = puzzleConfig.current;
 
-    }, [backgroundColor, endPoints, height, outerBackgroundColor, startPoints, width]);
+    }, [backgroundColor, endPoints, height, outerBackgroundColor, startPoints, uuid, width]);
 
     // init worker / if worker is not supported, then use generator in main process
     useEffect(() => {
@@ -93,7 +87,7 @@ export default function TheWitnessPuzzle(
         }
     }, [])
 
-    // handle generate
+    // generate random puzzle
     useEffect(() => {
         if (symbols.length > 18) {
             console.error("the num of symbols cannot more than 9")
@@ -116,7 +110,8 @@ export default function TheWitnessPuzzle(
                     puzzleRef.current.innerHTML = " "
                     panel.current = Panel.ObjectToPanel(event.data.panel);
                     puzzle.current = phasePuzzle(panel.current)
-                    draw(puzzle.current)
+                    puzzle.current.config = puzzleConfig.current;
+                    draw(puzzle.current, uuid)
                 }
             }
         } else {
@@ -127,23 +122,37 @@ export default function TheWitnessPuzzle(
             generator.current.generate(panel.current, symbols[0], symbols[1], symbols[2], symbols[3], symbols[4], symbols[5], symbols[6], symbols[7], symbols[8], symbols[9], symbols[10], symbols[11], symbols[12], symbols[13], symbols[14], symbols[15], symbols[16], symbols[17]);
             console.timeEnd("suspectFunction");
             puzzle.current = phasePuzzle(panel.current)
-            draw(puzzle.current)
+            puzzle.current.config = puzzleConfig.current;
+            draw(puzzle.current, uuid)
         }
 
-    }, [width, height, symbols]);
+    }, [width, height, symbols, uuid]);
+
+    // puzzle config
+    useEffect(() => {
+        puzzleConfig.current = {
+            volume,
+            sensitivity,
+            enableEndHints,
+            wittleTracing: true,
+            onSuccess,
+        }
+    }, [enableEndHints, onSuccess, sensitivity, volume]);
 
     function autoSolve() {
-        if(puzzle.current) {
+        if (puzzle.current) {
             const puzzle_1 = puzzle.current;
 
             const puzzleSolver = new PuzzleSolver(puzzle_1)
-            const f1 = () => {}
-            const f2 = () => {}
-            const solution = puzzleSolver.solve(f1,f2)[0];
-            PuzzleSolver.drawPath(puzzle_1, solution,puzzleRef.current);
-            generatorWorker.current.postMessage({
-                type: 'getPath'
-            })
+            const f1 = () => {
+            }
+            const f2 = () => {
+            }
+            const solution = puzzleSolver.solve(f1, f2)[0];
+            PuzzleSolver.drawPath(puzzle_1, solution, puzzleRef.current);
+            // generatorWorker.current.postMessage({
+            //     type: 'getPath'
+            // })
         }
     }
 
@@ -153,10 +162,10 @@ export default function TheWitnessPuzzle(
              style={{display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
             <div ref={themeRef} className={styles[theme]}>
                 <div className="q">
-                    <svg ref={puzzleRef} id="puzzle"></svg>
+                    <svg ref={puzzleRef} id={uuid}></svg>
                 </div>
             </div>
-            <button onClick={autoSolve}>CLICK</button>
+            <button onClick={autoSolve}>Answer</button>
         </div>
     )
 }

@@ -2,6 +2,7 @@ import {Decoration, Endpoint, IntersectionFlags, Panel} from "./generator/Panel.
 import Puzzle from "./puzzle/puzzle.ts";
 import type {EndDirection, GridCell, LineCell} from "./puzzle/cell.ts";
 import {DOT_BLACK, GAP_BREAK} from "./puzzle/constants.ts";
+import {ROTATION_BIT} from "./puzzle/polyominos.ts";
 import {logHexMatrix} from "./generator/utils/Debug_Tools.ts";
 
 function phaseColor(color: number): string {
@@ -41,10 +42,10 @@ function phaseCell(decoration: number): GridCell {
     const color: string = phaseColor(decoration & 0xF);
     const shape: number = (decoration & ~0XF);
 
-    if ((decoration & 0x0400) === Decoration.Shape.Poly) {
+    if ((decoration & 0xFFF) === Decoration.Shape.Poly) {
         let poly = decoration >> 16;
         let newPoly = 0; // 存储最终变换结果
-        const array: number[][] = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]];
+        const array: number[][] = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
 
         // 遍历4x4网格的所有16个bit（位置0~15）
         for (let pos = 0; pos < 16; pos++) {
@@ -66,12 +67,13 @@ function phaseCell(decoration: number): GridCell {
         // console.info(array,(decoration >> 16).toString(16))
 
         // 转换为puzzle的格式
-        for (let j=3;j>=0;j--) {
+        for (let j = 3; j >= 0; j--) {
             const col = array[0][j] | (array[1][j] << 1) | (array[2][j] << 2) | (array[3][j] << 3);
             newPoly = (newPoly << 4) | col;
         }
 
-        return {type: 'poly', polyshape: newPoly, color: "#fff"}
+        if((decoration & Decoration.Shape.Can_Rotate) !== 0) return {type: 'poly', polyshape: newPoly | ROTATION_BIT, color: "#fff"}
+        return {type: 'poly', polyshape: newPoly, color: color}
     }
 
     switch (shape) {
@@ -79,6 +81,8 @@ function phaseCell(decoration: number): GridCell {
             return {type: 'square', color: color};
         case Decoration.Shape.Star:
             return {type: 'star', color: color};
+        case Decoration.Shape.Eraser:
+            return {type: 'nega', color: color};
         case (Decoration.Shape.Triangle | 0x10000):
             return {type: 'triangle', count: 1, color: color};
         case (Decoration.Shape.Triangle | 0x20000):
@@ -122,7 +126,7 @@ export function phasePuzzle(_panel: Panel) {
     const width = Math.trunc((_panel.Width - 1) / 2);
     const puzzle = new Puzzle(width, height);
     const grid = _panel.Grid;
-    // logHexMatrix(grid)
+    logHexMatrix(grid)
     // console.info(puzzle.grid)
 
     // 旋转输出?
