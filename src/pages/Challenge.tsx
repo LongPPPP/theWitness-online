@@ -1,5 +1,5 @@
-import TheWitnessPuzzle from "../TheWitnessPuzzle/TheWitnessPuzzle.tsx";
-import MusicPlayer from "../MusicPlayer/MusicPlayer.tsx";
+import TheWitnessPuzzle from "../components/TheWitnessPuzzle/TheWitnessPuzzle.tsx";
+import MusicPlayer from "../components/MusicPlayer/MusicPlayer.tsx";
 import {useState} from 'react';
 
 const endPoints: {

@@ -4,6 +4,7 @@ import type {EndDirection, GridCell, LineCell} from "./puzzle/cell.ts";
 import {DOT_BLACK, GAP_BREAK} from "./puzzle/constants.ts";
 import {ROTATION_BIT} from "./puzzle/polyominos.ts";
 import {logHexMatrix} from "./generator/utils/Debug_Tools.ts";
+import {type SVGType} from "./puzzle/svg";
 
 function phaseColor(color: number): string {
     switch (color) {
@@ -42,7 +43,7 @@ function phaseCell(decoration: number): GridCell {
     const color: string = phaseColor(decoration & 0xF);
     const shape: number = (decoration & ~0XF);
 
-    if ((decoration & 0xFFF) === Decoration.Shape.Poly) {
+    if ((decoration & 0xF00) === Decoration.Shape.Poly) {
         let poly = decoration >> 16;
         let newPoly = 0; // 存储最终变换结果
         const array: number[][] = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
@@ -72,8 +73,14 @@ function phaseCell(decoration: number): GridCell {
             newPoly = (newPoly << 4) | col;
         }
 
-        if((decoration & Decoration.Shape.Can_Rotate) !== 0) return {type: 'poly', polyshape: newPoly | ROTATION_BIT, color: "#fff"}
-        return {type: 'poly', polyshape: newPoly, color: color}
+        let type:SVGType = 'poly'
+        if((decoration & Decoration.Shape.Can_Rotate) !== 0) {
+            newPoly |= ROTATION_BIT
+        }
+        if((decoration & Decoration.Shape.Negative) !== 0) {
+            type = 'ylop'
+        }
+        return {type: type, polyshape: newPoly, color: color}
     }
 
     switch (shape) {
@@ -108,6 +115,8 @@ function phasePath(decoration: number): LineCell {
         case Decoration.Shape.Gap_Column:
             return {type: 'line', line: 0, gap: GAP_BREAK};
         case Decoration.Shape.Dot_Intersection:
+        case Decoration.Shape.Dot_Column:
+        case Decoration.Shape.Dot_Row:
             return {type: 'line', line: 0, dot: DOT_BLACK}
         case IntersectionFlags.INTERSECTION:
             return {type: 'line', line: 0}

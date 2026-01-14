@@ -1,0 +1,217 @@
+.dragDivider {
+    cursor: ew-resize;
+    height: 100%;
+    transition: background-color 0.2s;
+    background-color: transparent;
+
+    &:hover {
+        background-color: #0080FF;
+    }
+
+    &::after {
+        content: "";
+        position: absolute;
+        width: 2px;
+        height: 24px;
+        background: #00000019;
+        border-radius: 2px;
+        top: 50%;
+        transform: translate(-50%, -50%);
+    }
+}
+
+/* 颜色选择器 */
+.colorPicker {
+    display: flex;
+    align-items: center;
+    border: 1px solid #000;
+    padding: 2px;
+    border-radius: 3px;
+    position: relative;
+    width: 112px;
+
+    .selectedColorBox {
+        width: 32px;
+        height: 32px;
+        border-radius: 3px;
+        cursor: pointer;
+        border: #e0e0e0 1px solid;
+    }
+
+    .colorSelectBox {
+        display: grid;
+        position: absolute;
+        left: -1px;
+        top: 100%;
+        border-radius: 3px;
+        border: 1px solid #000;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 4px;
+        background-color: hsl(48, 33%, 97%);
+        z-index: 1;
+        padding: 4px;
+
+        .colorBox {
+            width: 24px;
+            height: 24px;
+            border-radius: 3px;
+            cursor: pointer;
+
+            &:hover {
+                transform: scale(1.2);
+                transition: all .2s;
+            }
+        }
+    }
+}
+
+/* 表单条目前缀，包括svg（square/start/end/...）和类型 */
+.symbolSVG {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/*.symbolSelectBox {*/
+/*    display: grid;*/
+/*    background-color: hsl(48,33%,97%);*/
+/*    position: absolute;*/
+/*    width: 100%;*/
+/*    height: 100%;*/
+/*    bottom: 0;*/
+/*    transform: translateY(100%);*/
+/*    z-index: 1;*/
+/*    border: 2px black solid;*/
+/*    border-radius: 16px;*/
+/*}*/
+
+/* 表单 */
+.elementPicker {
+    border: 1px solid #e0e0e0;
+    border-radius: 16px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 24px;
+    height: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+
+    .title {
+        font-size: 20px;
+        font-weight: bold;
+        /*justify-content: space-between;*/
+        align-items: center;
+        display: flex;
+        padding: 8px;
+        border-bottom: 1px dashed #000;
+        margin-bottom: 16px;
+
+
+        .iconBtn {
+            &:first-of-type {
+                margin-left: auto; /* 第一个icon把icon元素推到右边 */
+            }
+        }
+    }
+
+    /* 表单每一行元素 */
+
+    .element {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        min-height: 64px;
+        width: 100%;
+        background: transparent;
+        border: 2px black solid;
+        border-radius: 16px;
+        color: black;
+        font-weight: bold;
+        font-size: 16px;
+        margin-bottom: 16px;
+        gap: 8px;
+        transition: width 0.3s ease;
+        flex-wrap: wrap;
+
+        .elementLeft {
+            display: flex;
+            justify-content: left;
+            align-items: center;
+            height: 100%;
+            position: relative;
+
+            .name {
+                width: 96px;
+                height: 100%;
+                display: flex;
+                justify-content: left;
+                align-items: center;
+            }
+
+        }
+
+        .elementMid {
+            display: flex;
+            justify-content: right;
+            align-items: center;
+            height: 100%;
+            flex: 1;
+        }
+
+        .elementRight {
+            display: flex;
+            justify-content: right;
+            align-items: center;
+            padding-right: 8px;
+            height: 100%;
+        }
+    }
+
+    .listContainer {
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    .addElementBox {
+        display: flex;
+        flex-wrap: wrap;
+        font-size: 20px;
+        font-weight: bold;
+        justify-content: center;
+        align-items: center;
+        padding: 8px;
+        border-top: 1px dashed #000;
+        margin-top: 16px;
+        position: relative;
+        flex-shrink: 0; /* 固定在底部，不被中间区域挤压 */
+
+        .addElementTitle {
+            top: 0;
+            color: gray;
+            font-weight: bold;
+            font-size: 16px;
+            /*transform: translateY(-100%);*/
+        }
+
+        .symbolBox {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 4px;
+            max-height: 150px;
+
+            .symbolIcon {
+                border: 1px solid grey;
+                cursor: pointer;
+                border-radius: 4px;
+
+                &:hover {
+                    transform: scale(1.1);
+                }
+            }
+        }
+    }
+}

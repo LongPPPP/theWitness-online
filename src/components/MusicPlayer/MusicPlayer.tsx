@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
-import cover from '../../src/assets/picture/cover.jpg'
-import disc from '../../src/assets/picture/disc-ip6.png'
-import needle from '../../src/assets/picture/needle-ip6.png'
+import cover from '../../assets/picture/cover.jpg'
+import disc from '../../assets/picture/disc-ip6.png'
+import needle from '../../assets/picture/needle-ip6.png'
 import styles from "./MusicPlayer.module.css";
 
 interface Props {

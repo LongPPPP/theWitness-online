@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react';
-import styles from "./TheWitnessPuzzle/style/BrowserSupportChecker.module.css";
+import styles from "./BrowserSupportChecker.module.css";
 
 const BrowserSupportChecker = () => {
     // 存储检测结果的状态

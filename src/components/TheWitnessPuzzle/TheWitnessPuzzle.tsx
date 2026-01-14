@@ -31,7 +31,7 @@ export default function TheWitnessPuzzle(
         height,
         startPoints = [],
         endPoints = [],
-        symbols,
+        symbols = [],
         seed,
         outerBackgroundColor,
         backgroundColor,
@@ -85,7 +85,7 @@ export default function TheWitnessPuzzle(
         } else {
             generator.current = new Generator(seed);
         }
-    }, [])
+    }, [seed])
 
     // generate random puzzle
     useEffect(() => {
@@ -126,7 +126,7 @@ export default function TheWitnessPuzzle(
             draw(puzzle.current, uuid)
         }
 
-    }, [width, height, symbols, uuid]);
+    }, [width, height, symbols, uuid, seed]);
 
     // puzzle config
     useEffect(() => {
@@ -169,3 +169,6 @@ export default function TheWitnessPuzzle(
         </div>
     )
 }
+
+// 参数列表在更新的时候，不会触发generator操作，比如seed改变的时候，只返回了 JSX
+// 但是symbol改变的时候有专门的处理逻辑，可以正确生成

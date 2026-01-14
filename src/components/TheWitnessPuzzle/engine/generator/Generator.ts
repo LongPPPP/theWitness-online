@@ -483,13 +483,13 @@ export class Generator {
      * Place the provided symbols onto the puzzle. symbols - a structure describing types and amounts of symbols to add.
      */
     private place_all_symbols(symbols: PuzzleSymbols): boolean {
-        const eraseSymbols = new Array<number>;
-        const eraserColors = new Array<number>;
+        const eraseSymbols = Array<number>();
+        const eraserColors = Array<number>();
         //If erasers are present, choose symbols to be erased and remove them pre-emptively
         for (const s of symbols.getSymbols(Decoration.Shape.Eraser)) {
             for (let i = 0; i < s.Value; i++) {
                 eraserColors.push(s.Key & 0xf);
-                eraseSymbols.push(this.hasFlag(Config.FalseParity) ? Decoration.Shape.Dot_Intersection : symbols.popRandomSymbol(this._random));
+                eraseSymbols.push(this.hasFlag(Config.FalseParity) ? Decoration.Shape.Dot_Intersection : symbols.popRandomSymbol());
             }
         }
 
