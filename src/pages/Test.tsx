@@ -1,6 +1,7 @@
 import TheWitnessPuzzle from "../components/TheWitnessPuzzle/TheWitnessPuzzle.tsx";
 import {Decoration} from "../components/TheWitnessPuzzle/engine/generator/Panel.ts";
-import React, {useState} from "react";
+import {useState} from "react";
+import PuzzleConfigProvider from "../components/TheWitnessPuzzle/context/PuzzleConfigProvider.tsx";
 
 const symbols = [
     Decoration.Shape.Exit, 1,
@@ -47,18 +48,30 @@ export default function Test() {
     const [theme, setTheme] = useState('theme-light')
     const [enableDrag, setEnableDrag] = useState(false)
     const [generatorConfig, setGeneratorConfig] = useState(undefined)
-    const [b64c,setB64code] = useState('INITIAL VALUE')
+    const [b64c, setB64code] = useState(null)
 
     return (
         <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column'}}>
-            <TheWitnessPuzzle
-                theme={theme}
-                defaultWidth={4}
-                defaultHeight={4}
-                generatorConfig={generatorConfig}
-                showSolution={showSolution}
-                enableResizeDrag={enableDrag}
-            />
+            <PuzzleConfigProvider>
+                <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
+                    <TheWitnessPuzzle
+                        theme={theme}
+                        defaultWidth={4}
+                        defaultHeight={4}
+                        generatorConfig={generatorConfig}
+                        showSolution={showSolution}
+                        enableResizeDrag={enableDrag}
+                        onPuzzleChange={(b64code) => {
+                            setB64code(b64code)
+                            console.info(b64code)
+                        }}
+                    />
+                    <TheWitnessPuzzle
+                        theme={'theme-dark'}
+                        pIDBase64={'AQAAAAkJAAAYrwMxFAIDAzsAAAUCAwc7AiMUAgcHOwBgAAIACDsAYAABCAA7OwAAAAE'}
+                    />
+                </div>
+            </PuzzleConfigProvider>
             <div style={{width: '432px'}}>
                 <button onClick={() => {
                     setRefresh(Math.random())
@@ -81,12 +94,12 @@ export default function Test() {
                 }}>Test Drag
                 </button>
                 <button onClick={() => {
-                    const cfg = {seed:undefined, symbols:symbols1};
+                    const cfg = {seed: undefined, symbols: symbols1};
                     setGeneratorConfig(cfg)
                     console.info('toggled')
                 }}>Test Generate
                 </button>
-                <input type={"text"} value={b64c} onChange={(e) => setB64code(e.target.value)} />
+                <input type={"text"} value={b64c} onChange={(e) => setB64code(e.target.value)}/>
             </div>
         </div>
     )

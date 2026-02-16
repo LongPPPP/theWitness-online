@@ -355,8 +355,8 @@ export class Panel {
         this.decorationsOnly = false;
         this.enableFlash = false;
         //ReadIntersections();
-        this.SetGridSymbol(startX,startY,Decoration.Shape.Start,Decoration.Color.None);
-        this.SetGridSymbol(endX,endY,Decoration.Shape.Exit,Decoration.Color.None);
+        this.SetGridSymbol(startX, startY, Decoration.Shape.Start, Decoration.Color.None);
+        this.SetGridSymbol(endX, endY, Decoration.Shape.Exit, Decoration.Color.None);
     }
 
     public SetSymbol(x: number, y: number, symbol: Decoration.Shape, color: Decoration.Color) {
@@ -610,18 +610,19 @@ export class Panel {
         return {...panel};
     }
 
-    public Serialize(): string {
+    public serialize(): string {
         // symmetry 最大值为15 占用1字节
         // ColorMode 最大值为5 占用1字节
         // decorationsOnly 和 enableFlash 占用1字节
         // _width 最大值为21 占用1字节
         // _height 最大值为21 占用1字节
-        // _grid中元素占用3字节 采用不为0的元素数量和坐标进行压缩
-        // (x,y,symbol) (1字节，1字节，3字节)
-        // _startpoints 不存放，在反序列化的时候计算
-        // _endpoints (1字节，1字节) dir在反序列化时候自动计算
+        // _grid中元素占用4字节 采用不为0的元素数量和坐标进行压缩
+        // (x,y,symbol) (1字节，1字节，4字节)
+        // (x,y,_startpoints) (1字节，1字节，4字节)
+        // (x,y,_endpoints) (1字节，1字节，4字节) dir在反序列化时候自动计算
         // _style 4字节
         // id 4字节
+        console.info(this)
 
         const symmetryBytes = 1;
         const colorModeBytes = 1;
@@ -635,20 +636,21 @@ export class Panel {
         const hashmap = new Map<number, Point[]>();
         for (const row of this._grid) {
             for (const cell of row) {
-                if (cell !== 0 && cell !== IntersectionFlags.INTERSECTION) {
+                if (cell !== 0 && cell !== IntersectionFlags.INTERSECTION && cell !== Decoration.Shape.Start) {
                     if (!hashmap.has(cell)) {
-                        gridBytes += 3; // symbol占3字节
+                        gridBytes += 4; // symbol占3字节
                         gridBytes += 1; // 序列终止符占1字节
                         hashmap.set(cell, []);
                     }
-                    const x = row.indexOf(cell);
-                    const y = this._grid.indexOf(row);
+                    const y = row.indexOf(cell);
+                    const x = this._grid.indexOf(row);
                     hashmap.get(cell)!.push(new Point(x, y));
                     gridBytes += widthBytes + heightBytes; // x,y坐标一共占2字节
                 }
             }
         }
-        gridBytes += this._endpoints.length * (widthBytes + heightBytes) + 1; // 每个endpoint存储x,y (1字节，1字节) + 1字节的终止符
+        gridBytes += this._startpoints.length * (widthBytes + heightBytes) + 4 + 1; // 每个startpoint存储x,y (1字节，1字节，4字节) + 1字节的终止符
+        gridBytes += this._endpoints.length * (widthBytes + heightBytes) + 4 + 1; // 每个endpoint存储x,y (1字节，1字节，4字节) + 1字节的终止符
         gridBytes += 1; // grid数据末尾的终止符占1字节
 
         const totalBytes =
@@ -674,21 +676,40 @@ export class Panel {
         buffer[offset++] = id & 0xFF;
 
         for (const [symbol, pos] of hashmap.entries()) {
-            buffer[offset++] = (symbol >> 16) & 0xFF; // symbol高8位
-            buffer[offset++] = (symbol >> 8) & 0xFF; // symbol中8位
-            buffer[offset++] = symbol & 0xFF; // symbol低8位
+            buffer[offset++] = (symbol >> 24) & 0xFF; // symbol 31-24位
+            buffer[offset++] = (symbol >> 16) & 0xFF; // symbol 23-16位
+            buffer[offset++] = (symbol >> 8) & 0xFF; // symbol 15-8位
+            buffer[offset++] = symbol & 0xFF; // symbol 7-0位
             for (const p of pos) {
                 buffer[offset++] = p.first;
                 buffer[offset++] = p.second;
+                console.log(`Set symbol 0x${(symbol & ~0xF).toString(16)} with color ${symbol & 0xF} at (${p.first}, ${p.second})`);
             }
-            buffer[offset++] = Number(';');
+            buffer[offset++] = 59; // ;的ASCII码，表示该symbol的坐标序列结束
+
         }
+        buffer[offset++] = (Decoration.Shape.Start >> 24) & 0xFF; // Start symbol高8位
+        buffer[offset++] = (Decoration.Shape.Start >> 16) & 0xFF; // Start symbol高8位
+        buffer[offset++] = (Decoration.Shape.Start >> 8) & 0xFF; // Start symbol中8位
+        buffer[offset++] = Decoration.Shape.Start & 0xFF; // Start symbol低8位
+        for (const startpoint of this._startpoints) {
+            buffer[offset++] = startpoint.first;
+            buffer[offset++] = startpoint.second;
+            console.log(`Set symbol 0x${Decoration.Shape.Start.toString(16)} with color ${Decoration.Color.None} at (${startpoint.first}, ${startpoint.second})`);
+        }
+        buffer[offset++] = 59; // ;的ASCII码，表示该symbol的坐标序列结束
+
+        buffer[offset++] = (Decoration.Shape.Exit >> 24) & 0xFF; // Exit symbol高8位
+        buffer[offset++] = (Decoration.Shape.Exit >> 16) & 0xFF; // Exit symbol高8位
+        buffer[offset++] = (Decoration.Shape.Exit >> 8) & 0xFF; // Exit symbol中8位
+        buffer[offset++] = Decoration.Shape.Exit & 0xFF; // Exit symbol低8位
         for (const endpoint of this._endpoints) {
             buffer[offset++] = endpoint.GetX();
             buffer[offset++] = endpoint.GetY();
+            console.log(`Set symbol 0x${Decoration.Shape.Exit.toString(16)} with color ${Decoration.Color.None} at (${endpoint.GetX()}, ${endpoint.GetY()})`);
         }
-        buffer[offset++] = Number(';');
-        buffer[offset++] = Number(';');
+        buffer[offset++] = 59; // ;的ASCII码，表示该symbol的坐标序列结束
+        buffer[offset++] = 59; // ;的ASCII码，表示该grid序列结束
 
         const style = this._style;
         buffer[offset++] = (style >> 24) & 0xFF;
@@ -696,11 +717,10 @@ export class Panel {
         buffer[offset++] = (style >> 8) & 0xFF;
         buffer[offset++] = style & 0xFF;
 
-        console.warn('gridBytes:', gridBytes, 'totalBytes:', totalBytes);
         return btoa(String.fromCharCode(...buffer));
     }
 
-    public static Deserialize(base64: string): Panel {
+    public static deserialize(base64: string): Panel {
         const buffer = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
         let offset = 0;
 
@@ -717,19 +737,27 @@ export class Panel {
         const id = (buffer[offset++] << 24) | (buffer[offset++] << 16) | (buffer[offset++] << 8) | buffer[offset++];
 
         const panel = new Panel(id, width, height, 0, 0, width - 1, height - 1);
+        panel.Startpoints = []
+        panel.Endpoints = []
+
         panel.symmetry = symmetry;
         panel.colorMode = colorMode;
         panel.decorationsOnly = decorationsOnly;
         panel.enableFlash = enableFlash;
 
         // 解析cell，包括起点和终点
-        while (!(buffer[offset] === Number(';'))) {
-            const cell = (buffer[offset++] << 16) | (buffer[offset++] << 8) | buffer[offset++];
-            const symbol = cell & ~0xF as Decoration.Shape;
-            const color = cell & 0xF as Decoration.Color;
-            while (buffer[offset] !== Number(';')) {
+        while (buffer[offset] !== 59) {
+            const cell =  (buffer[offset++] << 24) | (buffer[offset++] << 16) | (buffer[offset++] << 8) | buffer[offset++];
+            let symbol = cell & ~0xF as Decoration.Shape;
+            let color = cell & 0xF as Decoration.Color;
+            if(cell === Decoration.Shape.Start || cell === Decoration.Shape.Exit) {
+                symbol = cell
+                color = Decoration.Color.None
+            }
+            while (buffer[offset] !== 59) {
                 const x = buffer[offset++];
                 const y = buffer[offset++];
+                console.log(`Set symbol 0x${symbol.toString(16)} with color ${color} at (${x}, ${y})`);
                 panel.SetGridSymbol(x, y, symbol, color);
             }
             offset++; // 跳过分隔符（元素坐标序列结束）

@@ -1,6 +1,6 @@
-import React, {useCallback, useEffect, useId, useMemo, useRef} from "react";
+import React, {useCallback, useEffect, useId, useMemo, useRef, useState} from "react";
 import {Generator} from "./engine/generator/Generator.ts";
-import {Decoration, IntersectionFlags, Panel} from "./engine/generator/Panel.ts";
+import {IntersectionFlags, Panel} from "./engine/generator/Panel.ts";
 import {phasePath, phasePuzzle} from "./engine/phase.ts";
 import {draw} from "./engine/puzzle/display2.ts";
 import styles from "./style/Puzzle.module.css";
@@ -10,6 +10,8 @@ import PuzzleSolver from "./engine/puzzle/solve.ts";
 import type {ReturnMessage} from "./engine/generator/generator.worker.ts";
 import * as Utils from "./engine/puzzle/utils.ts";
 import SymbolSVG from "./SymbolSVG.tsx";
+import {usePuzzleConfig} from "./context/PuzzleConfigContext.ts";
+import type {LineCell} from "./engine/puzzle/cell.ts";
 
 
 export interface GeneratorConfig {
@@ -18,27 +20,21 @@ export interface GeneratorConfig {
 }
 
 interface Props {
-    defaultWidth: number;
-    defaultHeight: number;
+    defaultWidth?: number;
+    defaultHeight?: number;
     theme?: 'theme-light' | 'theme-dark',
-    volume?: number,
-    sensitivity?: number,
-    enableEndHints?: boolean,
     enableResizeDrag?: boolean,
     outerBackgroundColor?: string,
     backgroundColor?: string,
-    puzzleGridBase64?: string,
+    pIDBase64?: string,
     showSolution?: 'none' | 'all' | 'single',
-    onSuccess?: (x: number, y: number) => void,
     generatorConfig?: GeneratorConfig,
+    onPuzzleChange?: (b64code: string) => void,
 }
 
 type DragPosition = {
     x: number;
     y: number;
-}
-
-const EMPTY_FUNC = () => {
 }
 
 // All puzzle elements remain fixed, the edge you're dragging is where the new
@@ -196,36 +192,36 @@ function resizePuzzle(dx: number, dy: number, drag: 'left' | 'top' | 'right' | '
 
             if (puzzle.symmetry == null) {
                 validDirs = puzzle.getValidEndDirs(x, y);
-                if (validDirs.includes(cell.end)) continue
+                if (validDirs.includes(cell.end)) continue;
 
                 if (validDirs.length === 0) {
-                    console.log('Endpoint at', x, y, 'no longer fits on the grid')
-                    puzzle.grid[x][y].end = null
+                    console.log('Endpoint at', x, y, 'no longer fits on the grid');
+                    (puzzle.grid[x][y] as LineCell).end = null;
                 } else {
-                    console.log('Changing direction of endpoint', x, y, 'from', cell.end, 'to', validDirs[0])
-                    puzzle.grid[x][y].end = validDirs[0]
+                    console.log('Changing direction of endpoint', x, y, 'from', cell.end, 'to', validDirs[0]);
+                    (puzzle.grid[x][y] as LineCell).end = validDirs[0];
                 }
             } else {
                 sym = puzzle.getSymmetricalPos(x, y);
                 let symDir = puzzle.getSymmetricalDir(cell.end);
                 validDirs = puzzle.getValidEndDirs(x, y);
                 const validSymDirs = puzzle.getValidEndDirs(sym.x, sym.y);
-                if (validDirs.includes(cell.end) && validSymDirs.includes(symDir)) continue
+                if (validDirs.includes(cell.end) && validSymDirs.includes(symDir)) continue;
 
                 while (validDirs.length > 0) {
                     const dir = validDirs.pop();
                     symDir = puzzle.getSymmetricalDir(dir)
                     if (validDirs.includes(dir) && validSymDirs.includes(symDir)) {
-                        console.log('Changing direction of endpoint', x, y, 'from', cell.end, 'to', dir)
-                        puzzle.grid[x][y].end = dir
-                        puzzle.grid[sym.x][sym.y].end = symDir
+                        console.log('Changing direction of endpoint', x, y, 'from', cell.end, 'to', dir);
+                        (puzzle.grid[x][y] as LineCell).end = dir;
+                        (puzzle.grid[x][y] as LineCell).end = symDir;
                         break
                     }
                 }
                 if (validDirs.length === 0 || validSymDirs.length === 0) {
-                    console.log('Endpoint at', x, y, 'no longer fits on the grid')
-                    puzzle.grid[x][y].end = null
-                    puzzle.grid[sym.x][sym.y].end = null
+                    console.log('Endpoint at', x, y, 'no longer fits on the grid');
+                    (puzzle.grid[x][y] as LineCell).end = null;
+                    (puzzle.grid[x][y] as LineCell).end = null;
                 }
             }
         }
@@ -233,31 +229,28 @@ function resizePuzzle(dx: number, dy: number, drag: 'left' | 'top' | 'right' | '
     return true
 }
 
-function panelToBase64(panel: Panel): string {
-    // const str = JSON.stringify(Panel.PanelToObject(panel))
-    // console.warn( btoa(encodeURIComponent(str)))
-    const str = panel.Serialize()
-    console.warn( btoa(encodeURIComponent(str)))
-    return btoa(encodeURIComponent(str))
-}
-
-function base64ToPanel(base64: string): Panel {
+function autoSolve(puzzle:Puzzle) {
+        const puzzleSolver = new PuzzleSolver(puzzle)
+        const f1 = () => {
+        }
+        const f2 = () => {
+        }
+        return puzzleSolver.solve(f1, f2);
+    
 }
 
 const TheWitnessPuzzle = (
     {
-        defaultWidth,
-        defaultHeight,
+        defaultWidth = 3,
+        defaultHeight = 3,
         outerBackgroundColor,
         backgroundColor,
         theme = 'theme-light',
-        volume = 1,
-        sensitivity = 0.7,
-        enableEndHints = true,
         enableResizeDrag = false,
         showSolution = 'none',
-        onSuccess = EMPTY_FUNC,
         generatorConfig = undefined,
+        onPuzzleChange,
+        pIDBase64,
     }: Props
 ) => {
     const uuid = "puzzle_" + useId()
@@ -268,29 +261,32 @@ const TheWitnessPuzzle = (
     const generatorWorker = useRef<Worker>(null)
     const generator = useRef<Generator>(null) // generator 生成 panel
     const panel = useRef<Panel>(null) // panel 转化成 puzzle; panel可以理解为puzzle的原型
-    const puzzle = useRef<Puzzle>(null) // puzzle 用于渲染
+    const [puzzle,setPuzzle] = useState<Puzzle>(null) // puzzle 用于渲染
     const solution = useRef<Array<(number | { x: number, y: number })>[]>(null)
     const dragging = useRef<DragPosition | null>(null);
+    const {config} = usePuzzleConfig();
 
     // init puzzle
     useEffect(() => {
-        // puzzle.current = new Puzzle(4, 4)
-        panel.current = new Panel(0x018AF, 4*2+1, 4*2+1, 8, 0, 0, 8)
-        for (let x = 0; x < panel.current.Width; x++) {
-            for (let y = 0; y < panel.current.Height; y++) {
-                if((x&1) === 0 && (y&1) === 0) {
-                    panel.current.Grid[x][y] |= IntersectionFlags.INTERSECTION
+        if(pIDBase64) {
+            panel.current = Panel.deserialize(pIDBase64) // TODO:添加报错检查
+        } else {
+            panel.current = new Panel(0x018AF, defaultWidth * 2 + 1, defaultHeight * 2 + 1, defaultWidth * 2, 0, 0, defaultHeight * 2)
+            for (let x = 0; x < panel.current.Width; x++) {
+                for (let y = 0; y < panel.current.Height; y++) {
+                    if ((x & 1) === 0 && (y & 1) === 0) {
+                        panel.current.Grid[x][y] |= IntersectionFlags.INTERSECTION
+                    }
                 }
             }
         }
-        puzzle.current = phasePuzzle(panel.current)
-        // puzzleRef.current.innerHTML = " "
-        draw(puzzle.current, uuid)
-    }, [uuid]);
+        console.error(uuid)
+        setPuzzle(phasePuzzle(panel.current))
+    }, [defaultHeight, defaultWidth, pIDBase64, uuid]);
 
     // init worker / if worker is not supported, then use generator in main process
     useEffect(() => {
-        if(!generatorConfig) return;
+        if (!generatorConfig) return;
 
         const seed = generatorConfig.seed;
         if (typeof window !== 'undefined' && 'Worker' in window) {
@@ -308,8 +304,7 @@ const TheWitnessPuzzle = (
 
     // generate random puzzle
     useEffect(() => {
-        if(!generatorConfig) return;
-        if (!width.current || !height.current) return;
+        if (!generatorConfig || !width.current || !height.current) return;
         const symbols = generatorConfig.symbols;
         if (symbols.length > 18) {
             console.error("the num of symbols cannot more than 9")
@@ -335,11 +330,10 @@ const TheWitnessPuzzle = (
                     console.error(event.data.message)
                 } else if (data.type === "success") {
                     puzzleRef.current.innerHTML = " "
-                    console.info(data.panel)
                     panel.current = Panel.ObjectToPanel(data.panel);
-                    puzzle.current = phasePuzzle(panel.current)
+                    setPuzzle(phasePuzzle(panel.current))
                     // puzzle.current.config = puzzleConfig.current;
-                    draw(puzzle.current, uuid)
+                    // draw(puzzle.current, uuid)
                     solution.current = [data.path];
                     // PuzzleSolver.drawPath(puzzle.current, solution.current[0], puzzleRef.current);
                 }
@@ -354,39 +348,24 @@ const TheWitnessPuzzle = (
                 symbols[7], symbols[8], symbols[9], symbols[10],
                 symbols[11], symbols[12], symbols[13], symbols[14],
                 symbols[15], symbols[16], symbols[17]);
-            puzzle.current = phasePuzzle(panel.current)
+            setPuzzle(phasePuzzle(panel.current))
             // puzzle.current.config = puzzleConfig.current;
-            draw(puzzle.current, uuid)
             solution.current = [phasePath(generator.current.Path, generator.current.Starts)]
         }
 
-    }, [width, height, uuid, generatorConfig]);
+    }, [width, height, generatorConfig]);
 
-    // puzzle config
+    // 更新 puzzle 背景颜色
     useEffect(() => {
         if (themeRef.current) {
             if (outerBackgroundColor != undefined) themeRef.current.style.setProperty('--outer-background', outerBackgroundColor)
             if (backgroundColor != undefined) themeRef.current.style.setProperty('--background', backgroundColor)
         }
-
-        if (puzzle.current) {
-            puzzle.current.config = {
-                ...puzzle.current.config,
-                volume,
-                sensitivity,
-                enableEndHints,
-                onSuccess,
-            }
-        }
-
-    }, [backgroundColor, enableEndHints, onSuccess, outerBackgroundColor, sensitivity, volume]);
+    }, [backgroundColor, outerBackgroundColor]);
 
     // 显示 solution
     useEffect(() => {
-        if (!puzzle.current) {
-            console.warn('puzzle is not ready yet')
-            return;
-        }
+        if(!puzzle) return;
         if (showSolution === 'none') {
             const puzzleElem = puzzleRef.current;
             Utils.deleteElementsByClassName(puzzleElem, 'cursor')
@@ -394,23 +373,34 @@ const TheWitnessPuzzle = (
             Utils.deleteElementsByClassName(puzzleElem, 'line-1')
             Utils.deleteElementsByClassName(puzzleElem, 'line-2')
             Utils.deleteElementsByClassName(puzzleElem, 'line-3')
-            puzzle.current.clearLines()
+            puzzle.clearLines()
             return;
         } else if (showSolution === 'single') {
             if (solution.current) {
-                PuzzleSolver.drawPath(puzzle.current, solution.current[0], puzzleRef.current);
+                PuzzleSolver.drawPath(puzzle, solution.current[0], puzzleRef.current);
                 return;
             } else {
                 // 若没有路径则自动计算一条。
-                autoSolve()
-                PuzzleSolver.drawPath(puzzle.current, solution.current[0], puzzleRef.current);
+                solution.current = autoSolve(puzzle)
+                PuzzleSolver.drawPath(puzzle, solution.current[0], puzzleRef.current);
                 return;
             }
         }
-    }, [showSolution])
+    }, [puzzle, showSolution])
 
     // 当puzzle变化的时候重新绘制puzzle
+    useEffect(()=>{
+        if(!puzzle) return;
+        draw(puzzle, uuid)
 
+        // TODO:修改
+        if(onPuzzleChange && panel.current) {
+            const newCode = panel.current.serialize();
+            if (pIDBase64 === newCode) return
+
+            onPuzzleChange(newCode);
+        }
+    },[config, onPuzzleChange, pIDBase64, puzzle, uuid])
 
     const dragStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
         event.preventDefault()
@@ -454,20 +444,20 @@ const TheWitnessPuzzle = (
 
             const xLim = 40;
             let xScale = 2;
-            if (puzzle.current.symmetry != null && puzzle.current.pillar === true) {
+            if (puzzle.symmetry != null && puzzle.pillar === true) {
                 xScale = 4;
             }
 
             let yLim = 40;
-            if (puzzle.current.height >= 9) {
+            if (puzzle.height >= 9) {
                 yLim = 60;
             }
             const yScale = 2;
 
             while (Math.abs(dx) >= xLim) {
                 const drag = (elemId.includes('right') ? 'right' : 'left');
-                if (!resizePuzzle(xScale * Math.sign(dx), 0, drag, puzzle.current)) break;
-                draw(puzzle.current, uuid);
+                if (!resizePuzzle(xScale * Math.sign(dx), 0, drag, puzzle)) break;
+                draw(puzzle, uuid);
                 width.current += xScale * Math.sign(dx) / 2; // 需要除以二（原本算上道路了）
                 dx -= Math.sign(dx) * xLim;
                 dragging.current.x = newDragging.x;
@@ -475,8 +465,8 @@ const TheWitnessPuzzle = (
 
             while (Math.abs(dy) >= yLim) {
                 const drag = (elemId.includes('top') ? 'top' : 'bottom');
-                if (!resizePuzzle(0, yScale * Math.sign(dy), drag, puzzle.current)) break;
-                draw(puzzle.current, uuid);
+                if (!resizePuzzle(0, yScale * Math.sign(dy), drag, puzzle)) break;
+                draw(puzzle, uuid);
                 height.current += yScale * Math.sign(dy) / 2;  // 需要除以二（原本算上道路了）
                 dy -= Math.sign(dy) * yLim;
                 dragging.current.y = newDragging.y;
@@ -495,7 +485,7 @@ const TheWitnessPuzzle = (
         // 添加事件监听器
         document.addEventListener('pointermove', dragMove);
         document.addEventListener('pointerup', dragEnd);
-    }, [uuid]); // 添加必要的依赖项
+    }, [puzzle, uuid]); // 添加必要的依赖项
     // 显示 drag size svg
     const sizeDrags = useMemo(() => {
         if (enableResizeDrag) {
@@ -582,19 +572,6 @@ const TheWitnessPuzzle = (
         }
     }, [dragStart, enableResizeDrag]);
 
-    function autoSolve() {
-        if (puzzle.current) {
-            const puzzle_1 = puzzle.current;
-
-            const puzzleSolver = new PuzzleSolver(puzzle_1)
-            const f1 = () => {
-            }
-            const f2 = () => {
-            }
-            solution.current = puzzleSolver.solve(f1, f2);
-        }
-    }
-
     return (
         <div className={styles.theme}>
             <div ref={themeRef} className={`${styles[theme]}`}>
@@ -603,11 +580,6 @@ const TheWitnessPuzzle = (
                     <svg ref={puzzleRef} id={uuid} style={{display: 'block'}}></svg>
                 </div>
             </div>
-            <button onClick={() => {
-                panelToBase64(panel.current)
-                console.info('transformed')
-            }}>Test Obj
-            </button>
         </div>
     )
 }
