@@ -253,30 +253,26 @@ export enum IntersectionFlags {
 
 export class Panel {
     public symmetry: Panel.Symmetry;
-    public pathWidth: number;
+    // public pathWidth: number;
     public colorMode: Panel.ColorMode;
     public decorationsOnly: boolean;
     public enableFlash: boolean;
-
 
     private _width: number;
     private _height: number;
     private _grid: number[][];
     private _startpoints: Point[];
     private _endpoints: Endpoint[];
-    private minx: number;
-    private miny: number;
-    private maxx: number;
-    private maxy: number;
-    private unitWidth: number;
-    private unitHeight: number;
     private _style: number;
-    private _resized: boolean;
-    private id: number;
-    private background_region_color: Color;
+    private readonly id: number;
 
-    private generatedPanels: Panel[];
-    private arrowPuzzles: Array<[number, number]>;
+    // private minx: number;
+    // private miny: number;
+    // private maxx: number;
+    // private maxy: number;
+    // private unitWidth: number;
+    // private unitHeight: number;
+
 
     public get Width(): number {
         return this._width;
@@ -348,19 +344,19 @@ export class Panel {
         this._grid = Array.from(Array(this._width), () => new Array(this._height).fill(0));
         //_startpoints.Clear();
         //_endpoints.Clear();
-        this._startpoints = [new Point(startX, startY)];
-        this._endpoints = [new Endpoint(endX, endY, Endpoint.Direction.UP, 4194305)];
+        // this._startpoints = [new Point(startX, startY)];
+        // this._endpoints = [new Endpoint(endX, endY, Endpoint.Direction.UP, 4194305)];
+        this._startpoints = [];
+        this._endpoints = [];
         this.symmetry = Panel.Symmetry.None;
         this._style = 1;
-        this.pathWidth = 1;
-        this._resized = false;
+        // this.pathWidth = 1;
         this.colorMode = Panel.ColorMode.Default;
         this.decorationsOnly = false;
         this.enableFlash = false;
-        this.generatedPanels = [];
-        this.arrowPuzzles = [];
-        this.background_region_color = new Color(255, 255, 255, 0);
         //ReadIntersections();
+        this.SetGridSymbol(startX,startY,Decoration.Shape.Start,Decoration.Color.None);
+        this.SetGridSymbol(endX,endY,Decoration.Shape.Exit,Decoration.Color.None);
     }
 
     public SetSymbol(x: number, y: number, symbol: Decoration.Shape, color: Decoration.Color) {
@@ -368,9 +364,9 @@ export class Panel {
         const gridY = y * 2 + ((symbol & IntersectionFlags.ROW) != 0 ? 0 : 1);
         if ((symbol & IntersectionFlags.DOT) != 0) {
             if (color === Decoration.Color.Blue || color === Decoration.Color.Cyan)
-                color = IntersectionFlags.DOT_IS_BLUE as Decoration.Color;
+                color = IntersectionFlags.DOT_IS_BLUE as unknown as Decoration.Color;
             else if (color === Decoration.Color.Orange || color === Decoration.Color.Yellow)
-                color = IntersectionFlags.DOT_IS_ORANGE as Decoration.Color;
+                color = IntersectionFlags.DOT_IS_ORANGE as unknown as Decoration.Color;
             else color = Decoration.Color.None;
 
             if (this.symmetry != Panel.Symmetry.None) {
@@ -435,21 +431,20 @@ export class Panel {
             if (e.GetX() === this._width - 1) e.SetX(width - 1);
             if (e.GetY() === this._height - 1) e.SetY(height - 1);
         }
-        if (this._width != this._height || width != height) {
-            const maxDim = Math.max(this.maxx - this.minx, this.maxy - this.miny);
-            const unitSize = maxDim / Math.max(width - 1, height - 1);
-            this.minx = 0.5 - unitSize * (width - 1) / 2;
-            this.maxx = 0.5 + unitSize * (width - 1) / 2;
-            this.miny = 0.5 - unitSize * (height - 1) / 2;
-            this.maxy = 0.5 + unitSize * (height - 1) / 2;
-        }
+        // if (this._width != this._height || width != height) {
+        //     const maxDim = Math.max(this.maxx - this.minx, this.maxy - this.miny);
+        //     const unitSize = maxDim / Math.max(width - 1, height - 1);
+        //     this.minx = 0.5 - unitSize * (width - 1) / 2;
+        //     this.maxx = 0.5 + unitSize * (width - 1) / 2;
+        //     this.miny = 0.5 - unitSize * (height - 1) / 2;
+        //     this.maxy = 0.5 + unitSize * (height - 1) / 2;
+        // }
         if (Point.pillarWidth != 0) Point.pillarWidth = width;
         this._width = width;
         this._height = height;
         this._grid = Array(this._width)
             .fill(null)
             .map(() => Array(this._height).fill(0));
-        this._resized = true;
     }
 
     public get_sym_point(x: number, y: number, symmetry?: Panel.Symmetry): Point;
@@ -604,14 +599,148 @@ export class Panel {
             const endpoint = Object.create(Endpoint.prototype);
             Object.assign(endpoint, end_obj);
             endpoints.push(endpoint);
-            console.info(endpoint.GetX());
+            // console.info(endpoint.GetX());
         }
         panel.Endpoints = endpoints;
 
         return panel;
     }
 
+    public static PanelToObject(panel: Panel): object {
+        return {...panel};
+    }
+
+    public Serialize(): string {
+        // symmetry 最大值为15 占用1字节
+        // ColorMode 最大值为5 占用1字节
+        // decorationsOnly 和 enableFlash 占用1字节
+        // _width 最大值为21 占用1字节
+        // _height 最大值为21 占用1字节
+        // _grid中元素占用3字节 采用不为0的元素数量和坐标进行压缩
+        // (x,y,symbol) (1字节，1字节，3字节)
+        // _startpoints 不存放，在反序列化的时候计算
+        // _endpoints (1字节，1字节) dir在反序列化时候自动计算
+        // _style 4字节
+        // id 4字节
+
+        const symmetryBytes = 1;
+        const colorModeBytes = 1;
+        const flagsBytes = 1;
+        const widthBytes = 1;
+        const heightBytes = 1;
+        const styleBytes = 4;
+        const idBytes = 4;
+        let gridBytes = 0;
+
+        const hashmap = new Map<number, Point[]>();
+        for (const row of this._grid) {
+            for (const cell of row) {
+                if (cell !== 0 && cell !== IntersectionFlags.INTERSECTION) {
+                    if (!hashmap.has(cell)) {
+                        gridBytes += 3; // symbol占3字节
+                        gridBytes += 1; // 序列终止符占1字节
+                        hashmap.set(cell, []);
+                    }
+                    const x = row.indexOf(cell);
+                    const y = this._grid.indexOf(row);
+                    hashmap.get(cell)!.push(new Point(x, y));
+                    gridBytes += widthBytes + heightBytes; // x,y坐标一共占2字节
+                }
+            }
+        }
+        gridBytes += this._endpoints.length * (widthBytes + heightBytes) + 1; // 每个endpoint存储x,y (1字节，1字节) + 1字节的终止符
+        gridBytes += 1; // grid数据末尾的终止符占1字节
+
+        const totalBytes =
+            1 + // 版本号占1字节
+            symmetryBytes + colorModeBytes + flagsBytes +
+            widthBytes + heightBytes + gridBytes +
+            styleBytes + idBytes;
+
+        const buffer = new Uint8Array(totalBytes);
+        let offset = 0;
+
+        buffer[offset++] = 1; // 版本号
+        buffer[offset++] = this.symmetry;
+        buffer[offset++] = this.colorMode;
+        buffer[offset++] = (this.decorationsOnly ? 0x1 : 0) | (this.enableFlash ? 0x10 : 0);
+        buffer[offset++] = this._width;
+        buffer[offset++] = this._height;
+
+        const id = this.id;
+        buffer[offset++] = (id >> 24) & 0xFF;
+        buffer[offset++] = (id >> 16) & 0xFF;
+        buffer[offset++] = (id >> 8) & 0xFF;
+        buffer[offset++] = id & 0xFF;
+
+        for (const [symbol, pos] of hashmap.entries()) {
+            buffer[offset++] = (symbol >> 16) & 0xFF; // symbol高8位
+            buffer[offset++] = (symbol >> 8) & 0xFF; // symbol中8位
+            buffer[offset++] = symbol & 0xFF; // symbol低8位
+            for (const p of pos) {
+                buffer[offset++] = p.first;
+                buffer[offset++] = p.second;
+            }
+            buffer[offset++] = Number(';');
+        }
+        for (const endpoint of this._endpoints) {
+            buffer[offset++] = endpoint.GetX();
+            buffer[offset++] = endpoint.GetY();
+        }
+        buffer[offset++] = Number(';');
+        buffer[offset++] = Number(';');
+
+        const style = this._style;
+        buffer[offset++] = (style >> 24) & 0xFF;
+        buffer[offset++] = (style >> 16) & 0xFF;
+        buffer[offset++] = (style >> 8) & 0xFF;
+        buffer[offset++] = style & 0xFF;
+
+        console.warn('gridBytes:', gridBytes, 'totalBytes:', totalBytes);
+        return btoa(String.fromCharCode(...buffer));
+    }
+
+    public static Deserialize(base64: string): Panel {
+        const buffer = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+        let offset = 0;
+
+        const version = buffer[offset++];
+        if (version !== 1) throw new Error('Unsupported version: ' + version);
+
+        const symmetry = buffer[offset++];
+        const colorMode = buffer[offset++];
+        const flags = buffer[offset++];
+        const decorationsOnly = (flags & 0x1) !== 0;
+        const enableFlash = (flags & 0x10) !== 0;
+        const width = buffer[offset++];
+        const height = buffer[offset++];
+        const id = (buffer[offset++] << 24) | (buffer[offset++] << 16) | (buffer[offset++] << 8) | buffer[offset++];
+
+        const panel = new Panel(id, width, height, 0, 0, width - 1, height - 1);
+        panel.symmetry = symmetry;
+        panel.colorMode = colorMode;
+        panel.decorationsOnly = decorationsOnly;
+        panel.enableFlash = enableFlash;
+
+        // 解析cell，包括起点和终点
+        while (!(buffer[offset] === Number(';'))) {
+            const cell = (buffer[offset++] << 16) | (buffer[offset++] << 8) | buffer[offset++];
+            const symbol = cell & ~0xF as Decoration.Shape;
+            const color = cell & 0xF as Decoration.Color;
+            while (buffer[offset] !== Number(';')) {
+                const x = buffer[offset++];
+                const y = buffer[offset++];
+                panel.SetGridSymbol(x, y, symbol, color);
+            }
+            offset++; // 跳过分隔符（元素坐标序列结束）
+        }
+        offset++; // 跳过分隔符（gird列表结束）
+
+        panel.Style = (buffer[offset++] << 24) | (buffer[offset++] << 16) | (buffer[offset++] << 8) | buffer[offset++];
+        return panel;
+    }
 }
+
 export namespace Panel {
     export enum Symmetry { //NOTE - Not all of these are valid symmetries for certain puzzles
         None, Horizontal, Vertical, Rotational,
@@ -634,6 +763,7 @@ export namespace Panel {
         IS_PIVOTABLE = 0x8000,
     };
 }
+
 
 
 

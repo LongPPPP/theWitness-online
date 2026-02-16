@@ -15,6 +15,14 @@ export class Generator {
         return this._path;
     }
 
+    public get Starts(): SortedSet<Point> {
+        return this._starts;
+    }
+
+    public get Exits(): SortedSet<Point> {
+        return this._exits;
+    }
+
     public pathWidth: number = 1.0; // Controls how thick the line is on the puzzle
 
     public hitPoints: Point[] = [];           // The generated path will be forced to hit these points in order
@@ -132,7 +140,6 @@ export class Generator {
     public generate(panel: Panel, symbol1: number, amount1: number, symbol2: number, amount2: number, symbol3: number, amount3: number, symbol4: number, amount4: number, symbol5: number, amount5: number, symbol6: number, amount6: number, symbol7: number, amount7: number, symbol8: number, amount8: number): void;
     public generate(panel: Panel, symbol1: number, amount1: number, symbol2: number, amount2: number, symbol3: number, amount3: number, symbol4: number, amount4: number, symbol5: number, amount5: number, symbol6: number, amount6: number, symbol7: number, amount7: number, symbol8: number, amount8: number, symbol9: number, amount9: number): void;
     public generate(panel: Panel, ...args: number[]): void {
-        let symbols: PuzzleSymbols;
         const symbolVec: Array<KeyValuePair<number, number>> = [];
 
         switch (args.length) {
@@ -156,13 +163,12 @@ export class Generator {
                 symbolVec.push(new KeyValuePair(args[0], args[1]));
             case 0:
                 symbolVec.reverse()
-                symbols = new PuzzleSymbols(symbolVec);
                 break;
             default:
                 throw new Error("Invalid arguments");
         }
 
-        while (!this.generateInternal(panel, symbols)) ;
+        while (!this.generateInternal(panel, new PuzzleSymbols(symbolVec))) ;
         return;
     }
 
@@ -235,7 +241,7 @@ export class Generator {
         this._fullGaps = this.hasFlag(Config.FullGaps);
         if (this._symmetry !== 0 || this._id === 0x00076 || this._id === 0x01D3F) this._panel.symmetry = this._symmetry; //Init user-defined puzzle symmetry if not "None".
         //0x00076 (Symmetry Island Fading Lines 7) and 0x01D3F (Keep Blue Pressure Plates) are exceptions because they need to have symmetry removed
-        if (this.pathWidth !== 1) this._panel.pathWidth = this.pathWidth; //Init path scale. "1" is considered the default, and therefore means no change.
+        // if (this.pathWidth !== 1) this._panel.pathWidth = this.pathWidth; //Init path scale. "1" is considered the default, and therefore means no change.
     }
 
     public setPath(path: SortedSet<Point>): void {

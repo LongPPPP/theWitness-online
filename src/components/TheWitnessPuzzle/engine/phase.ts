@@ -1,10 +1,11 @@
-import {Decoration, Endpoint, IntersectionFlags, Panel} from "./generator/Panel.ts";
+import {Decoration, Endpoint, IntersectionFlags, Panel, Point} from "./generator/Panel.ts";
 import Puzzle from "./puzzle/puzzle.ts";
 import type {EndDirection, GridCell, LineCell} from "./puzzle/cell.ts";
 import {DOT_BLACK, GAP_BREAK} from "./puzzle/constants.ts";
 import {ROTATION_BIT} from "./puzzle/polyominos.ts";
 import {logHexMatrix} from "./generator/utils/Debug_Tools.ts";
 import {type SVGType} from "./puzzle/svg";
+import type {SortedSet} from "./generator/utils/SortedSet.ts";
 
 function phaseColor(color: number): string {
     switch (color) {
@@ -73,11 +74,11 @@ function phaseCell(decoration: number): GridCell {
             newPoly = (newPoly << 4) | col;
         }
 
-        let type:SVGType = 'poly'
-        if((decoration & Decoration.Shape.Can_Rotate) !== 0) {
+        let type: SVGType = 'poly'
+        if ((decoration & Decoration.Shape.Can_Rotate) !== 0) {
             newPoly |= ROTATION_BIT
         }
-        if((decoration & Decoration.Shape.Negative) !== 0) {
+        if ((decoration & Decoration.Shape.Negative) !== 0) {
             type = 'ylop'
         }
         return {type: type, polyshape: newPoly, color: color}
@@ -104,13 +105,13 @@ function phaseCell(decoration: number): GridCell {
 }
 
 /**
- * return path only
+ * return line only
  * */
-function phasePath(decoration: number): LineCell {
-    const color: string = phaseColor(decoration & 0xF);
-    const path: number = (decoration & ~0XF);
+function phaseLine(decoration: number): LineCell {
+    // const color: string = phaseColor(decoration & 0xF);
+    const line: number = (decoration & ~0XF);
 
-    switch (path) {
+    switch (line) {
         case Decoration.Shape.Gap_Row:
         case Decoration.Shape.Gap_Column:
             return {type: 'line', line: 0, gap: GAP_BREAK};
@@ -146,7 +147,7 @@ export function phasePuzzle(_panel: Panel) {
             if ((row & 1) && (col & 1)) {
                 puzzle.setCell(row, col, phaseCell(decoration))
             } else {
-                puzzle.setCell(row, col, phasePath(decoration))
+                puzzle.setCell(row, col, phaseLine(decoration))
             }
 
         }
@@ -178,4 +179,80 @@ export function phasePuzzle(_panel: Panel) {
         puzzle.markEnd(end.GetX(), end.GetY(), dirs);
     }
     return puzzle
+}
+
+/**
+ * 转换generator中的path
+ * */
+export function phasePath(path: SortedSet<Point>, starts: SortedSet<Point>) {
+    let startPoint: Point;
+    let endPoint: Point;
+    // 找到可能的起点和终点（这两个点只有一个点可能和他们相邻！）
+    for (const point of path) {
+        let cnt = 0;
+        if (path.Contains(new Point(point.first - 1, point.second))) cnt++;
+        if (path.Contains(new Point(point.first + 1, point.second))) cnt++;
+        if (path.Contains(new Point(point.first, point.second - 1))) cnt++;
+        if (path.Contains(new Point(point.first, point.second + 1))) cnt++;
+        // console.info(`Path Point: (${point.first}, ${point.second}) cnt: ${cnt}`)
+        if (cnt === 1) {
+            // 接下来判断到底谁是起点谁是终点
+            if (starts.Contains(point)) {
+                startPoint = point;
+                // console.info(`Start Point: (${point.first}, ${point.second})`)
+            } else {
+                endPoint = point;
+            }
+        }
+    }
+
+    if (startPoint === undefined || endPoint === undefined) {
+        throw new Error("Cannot find start point or end point from path")
+    }
+
+    const result: (number | {x:number,y:number})[] = [];
+    result.push({x: startPoint.first, y: startPoint.second});
+
+    let currentPoint: Point = startPoint;
+    let prevPoint: Point = null;
+
+    while (!currentPoint.equals(endPoint)) {
+        // 找到下一个点
+        let nextPoint: Point = null;
+        const directions = [
+            new Point(currentPoint.first - 1, currentPoint.second),
+            new Point(currentPoint.first + 1, currentPoint.second),
+            new Point(currentPoint.first, currentPoint.second - 1),
+            new Point(currentPoint.first, currentPoint.second + 1),
+        ];
+
+        for (const dir of directions) {
+            if (path.Contains(dir) && (prevPoint === null || !dir.equals(prevPoint))) {
+                nextPoint = dir;
+                break;
+            }
+        }
+
+        if (nextPoint === null) {
+            throw new Error("Path is broken, cannot find next point from (" + currentPoint.first + ", " + currentPoint.second + ")")
+        }
+
+        // 记录方向
+        if (nextPoint.first === currentPoint.first - 1) {
+            result.push(1); // left
+        } else if (nextPoint.first === currentPoint.first + 1) {
+            result.push(2); // right
+        } else if (nextPoint.second === currentPoint.second - 1) {
+            result.push(3); // up
+        } else if (nextPoint.second === currentPoint.second + 1) {
+            result.push(4); // down
+        }
+
+        // 更新当前点和前一个点
+        prevPoint = currentPoint;
+        currentPoint = nextPoint;
+    }
+
+    result.push(0) // end
+    return result;
 }

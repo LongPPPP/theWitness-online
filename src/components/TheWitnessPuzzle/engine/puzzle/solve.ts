@@ -5,6 +5,7 @@ import {GAP_NONE, LINE_BLACK, LINE_BLUE, LINE_NONE, LINE_YELLOW} from "./constan
 import {validate, validateRegion} from "./validate.ts";
 import * as Trace2 from "./trace2.ts";
 import type {LineCell} from "./cell.ts";
+import * as Utils from "./utils.ts";
 
 const PATH_NONE = 0;
 const PATH_LEFT = 1;
@@ -153,26 +154,42 @@ export default class PuzzleSolver {
         // depend on the path through the entire puzzle
         this.doPruning = (puzzle.pillar === false && !puzzle.settings.CUSTOM_MECHANICS)
 
-        const self = this;
+        // const self = this;
+        // this.task = {
+        //     'code': function () {
+        //         const newTasks = [];
+        //
+        //         for (const pos of startPoints) {
+        //             // ;(function(a){}(a))
+        //             // This syntax is used to forcibly copy arguments which are otherwise part of the loop.
+        //             // Note that we don't need to copy objects, just value types.
+        //             ;(function (pos) {
+        //                 newTasks.push(function () {
+        //                     self.path = [pos]
+        //                     puzzle.startPoint = pos
+        //                     return self.solveLoop(pos.x, pos.y, numEndpoints, earlyExitData)
+        //                 })
+        //             }(pos))
+        //         }
+        //         return newTasks
+        //     }
+        // }
+
         this.task = {
-            'code': function () {
+            'code': () => {
                 const newTasks = [];
 
+                // 移除立即执行函数，直接使用 const pos 的块级作用域
                 for (const pos of startPoints) {
-                    // ;(function(a){}(a))
-                    // This syntax is used to forcibly copy arguments which are otherwise part of the loop.
-                    // Note that we don't need to copy objects, just value types.
-                    ;(function (pos) {
-                        newTasks.push(function () {
-                            self.path = [pos]
-                            puzzle.startPoint = pos
-                            return self.solveLoop(pos.x, pos.y, numEndpoints, earlyExitData)
-                        })
-                    }(pos))
+                    newTasks.push(() => {
+                        this.path = [pos];
+                        puzzle.startPoint = pos;
+                        return this.solveLoop(pos.x, pos.y, numEndpoints, earlyExitData);
+                    });
                 }
-                return newTasks
+                return newTasks;
             }
-        }
+        };
 
         this.taskLoop(partialCallback, () => {
             const end = (new Date()).getTime();
@@ -405,10 +422,11 @@ export default class PuzzleSolver {
     // and also modifies the puzzle to contain the solution path.
     static drawPath(puzzle: Puzzle, path: ({ x: number, y: number } | number)[], puzzleElem: SVGSVGElement) {
         const target = puzzleElem.id;
-        // window.deleteElementsByClassName(puzzleElem, 'cursor')
-        // window.deleteElementsByClassName(puzzleElem, 'line-1')
-        // window.deleteElementsByClassName(puzzleElem, 'line-2')
-        // window.deleteElementsByClassName(puzzleElem, 'line-3')
+        Utils.deleteElementsByClassName(puzzleElem, 'cursor')
+        Utils.deleteElementsByClassName(puzzleElem, 'end-hint')
+        Utils.deleteElementsByClassName(puzzleElem, 'line-1')
+        Utils.deleteElementsByClassName(puzzleElem, 'line-2')
+        Utils.deleteElementsByClassName(puzzleElem, 'line-3')
         puzzle.clearLines()
 
         if (path == null || path.length === 0) return // "drawing" an empty path is a shorthand for clearing the grid.

@@ -1,7 +1,7 @@
 
 export function logHexMatrix(matrix: number[][]) {
     if (!Array.isArray(matrix)) {
-        console.info('输入不是数组');
+        console.log('输入不是数组');
         return;
     }
 
@@ -13,6 +13,6 @@ export function logHexMatrix(matrix: number[][]) {
             }
             return '0x' + num.toString(16).toUpperCase();
         }).join(' ');
-        console.info(`[${hexRow}]`);
+        console.log(`[${hexRow}]`);
     });
 }

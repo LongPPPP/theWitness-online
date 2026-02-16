@@ -56,7 +56,8 @@ const NumberField: React.FC<NumberFieldProps> = ({
         MozAppearance: 'textfield',
         // 隐藏 Chrome/Safari 原生箭头（基础）
         WebkitAppearance: 'none',
-        appearance: 'textfield'
+        appearance: 'textfield',
+        fontWeight: 'bold',
     };
 
     const buttonsContainerStyle: CSSProperties = {

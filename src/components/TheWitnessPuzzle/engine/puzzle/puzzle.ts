@@ -10,6 +10,15 @@ export type PuzzleConfig = {
     onSuccess: (x: number, y: number) => void,
 }
 
+const DEFAULT_CONFIG: PuzzleConfig = {
+    volume: 1,
+    sensitivity: 0.7,
+    enableEndHints: true,
+    wittleTracing: true,
+    onSuccess: () => {
+    },
+}
+
 // A 2x2 grid is internally a 5x5:
 // corner, edge, corner, edge, corner
 // edge,   cell, edge,   cell, edge
@@ -37,7 +46,7 @@ export default class Puzzle {
     hasPolyominos: boolean;
 
     // ==========================================
-    config: PuzzleConfig;
+    config: PuzzleConfig = DEFAULT_CONFIG;
 
     constructor(width: number, height: number, pillar = false) {
         if (pillar) {

@@ -1,15 +1,15 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import TheWitnessPuzzle from "../../components/TheWitnessPuzzle/TheWitnessPuzzle.tsx";
 import style from "./Randomizer.module.css";
-import {drawSymbol, type SVGType} from "../../components/TheWitnessPuzzle/engine/puzzle/svg.ts";
-import type {EndDirection} from "../../components/TheWitnessPuzzle/engine/puzzle/cell.ts";
+import {type SVGType} from "../../components/TheWitnessPuzzle/engine/puzzle/svg.ts";
+import SymbolSVG, {type SVGParams} from "../../components/TheWitnessPuzzle/SymbolSVG.tsx";
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
 import NumberField from "./NumberField.tsx";
 import {ROTATION_BIT} from "../../components/TheWitnessPuzzle/engine/puzzle/polyominos.ts";
 import {Decoration} from "../../components/TheWitnessPuzzle/engine/generator/Panel.ts";
 import RefreshIcon from '@mui/icons-material/Refresh';
-import {IconButton, Tooltip} from "@mui/material";
+import {Button, IconButton, Tooltip} from "@mui/material";
 
 
 // 分割线组件（纯函数组件，无内部状态）
@@ -78,53 +78,6 @@ function ColorPicker({
     )
 }
 
-// 组件SymbolSVG (symbol Element 的前缀)
-interface SVGParams {
-    type: SVGType;
-    x?: number;
-    y?: number;
-    dir?: EndDirection;
-    count?: number;
-    polyshape?: number;
-    color?: string;
-    title?: string;
-}
-
-function SymbolSVG({defaultSymbol}: { defaultSymbol: SVGParams }) {
-    const eRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        if (!eRef) return;
-        const symbol = defaultSymbol;
-        const svgElement = drawSymbol({
-            type: symbol.type as SVGType,
-            width: 72,
-            height: 72,
-            x: symbol.x,
-            y: symbol.y,
-            dir: symbol.dir as EndDirection,
-            count: symbol.count,
-            polyshape: symbol.polyshape,
-            color: symbol.color,
-        }, false);
-        eRef.current.innerHTML = '';
-        eRef.current.appendChild(svgElement);
-    }, [defaultSymbol])
-
-    return (
-        <>
-            <div
-                ref={eRef}
-                style={{
-                    width: '48px',
-                    height: '48px',
-                    padding: 0,
-                }}
-            />
-        </>
-    )
-}
-
 // symbol Element List
 interface SymbolListProps {
     symbolList: (SVGParams & { id: number })[],
@@ -164,7 +117,7 @@ const SymbolList = ({
                             <SymbolSVG defaultSymbol={symbol}/>
                             <div className={style.name}>{symbol.title}</div>
                         </div>
-                        <div className={style.elementMid} style={{opacity: isDeleting ? 0 : 1}}>
+                        <div className={style.elementMid} style={{display: isDeleting ? 'none' : undefined}}>
                             {enableColorPicker(symbol.type) &&
                                 <ColorPicker defaultColor={'#000000'} onSelectColor={(color: string) => {
                                     onSelectColor(symbol.id, color);
@@ -173,7 +126,7 @@ const SymbolList = ({
                         </div>
                         <div className={style.elementRight}>
                             {/* isDeleting为false时显示NumberField */}
-                            {!isDeleting && (
+                            <div style={{display: isDeleting ? 'none' : undefined}}>
                                 <NumberField
                                     min={1}
                                     max={15}
@@ -182,7 +135,7 @@ const SymbolList = ({
                                         onNumberChange(symbol.id, value);
                                     }}
                                 />
-                            )}
+                            </div>
                             {/* isDeleting为true时显示删除图标 */}
                             {isDeleting && (
                                 <IconButton><HighlightOffIcon
@@ -343,13 +296,15 @@ const typeMap = {
     'triangle': Decoration.Shape.Triangle,
     'poly': Decoration.Shape.Poly,
     'ylop': Decoration.Shape.Poly | Decoration.Shape.Negative,
+    'nega': Decoration.Shape.Eraser,
 } as const;
 export default function Randomizer() {
     const [leftWidth, setLeftWidth] = useState(420);
-    const [seed, setSeed] = useState<string>('')
+    const [seed, setSeed] = useState<string>('x')
     const isDraggingRef = useRef(false);
     const dragRef = useRef({startX: 0, startWidth: 0});
     const savedSymbols = useRef<number[]>([]);
+    const [showSolution, setShowSolution] = useState<'none' | 'all' | 'single'>('none');
 
     const handleDragMove = useCallback((e: MouseEvent) => {
         if (!isDraggingRef.current) return;
@@ -405,10 +360,6 @@ export default function Randomizer() {
         }
     }, []);
 
-    const handleGenerate = useCallback(() => {
-        setSeed(`${Math.random()}`);
-    }, []);
-
     const leftPanel = useMemo(() => {
         return (
             <div
@@ -429,20 +380,33 @@ export default function Randomizer() {
                     height: "100%",
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center"
+                    justifyContent: "center",
+                    flexDirection: "column",
                 }}
             >
                 <TheWitnessPuzzle
                     theme={"theme-light"}
-                    width={4}
-                    height={4}
-                    symbols={savedSymbols.current}
-                    seed={seed}
+                    defaultWidth={4}
+                    defaultHeight={4}
+                    generatorConfig={{
+                        seed: seed,
+                        symbols: savedSymbols.current
+                    }}
+                    showSolution={showSolution}
+                    enableResizeDrag={true}
                 />
-                <button onClick={handleGenerate}>Generate</button>
+                <div className={style.flexCenter} style={{gap: '16px'}}>
+                    <Button variant="contained" size="large" color="success" onClick={() => {
+                        setShowSolution('none')
+                        setSeed(`${Math.random()}`);
+                    }}>Generate</Button>
+                    <Button variant="contained" size="large" onClick={() => {
+                        setShowSolution(showSolution === 'none' ? 'single' : 'none')
+                    }}>Solution</Button>
+                </div>
             </div>
         )
-    }, [handleGenerate, seed])
+    }, [seed, showSolution])
 
     useEffect(() => {
         return () => {

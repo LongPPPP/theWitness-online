@@ -513,7 +513,7 @@ export function trace(event: MouseEvent | TouchEvent, puzzle: Puzzle, pos: {
             }, 1)
 
             // Right-clicked (or double-tapped) and not at the end: Clear puzzle
-        } else if ((event as MouseEvent).button === 2 || (event as TouchEvent).touches.length > 1) {
+        } else if ((event as MouseEvent).button === 2 || (event as TouchEvent).touches?.length > 1) {
             Utils.PLAY_SOUND('abort', puzzle.config.volume)
             clearGrid(data.svg, puzzle)
         } else { // Exit lock but allow resuming from the cursor (Desktop only)

@@ -1,8 +1,20 @@
 import {Generator} from "./Generator.ts";
-import {Decoration, IntersectionFlags, Panel, Point} from "./Panel.ts";
+import {Decoration, Panel, Point} from "./Panel.ts";
+import {phasePath} from "../phase.ts";
 
-type messageType = 'generate' | 'setGridSize' | 'new Generator';
+type messageType = 'generate' | 'setGridSize' | 'new Generator' | 'get1Solution' | 'DEBUG_printPath';
 type argsType = number[] | string;
+
+export interface ReceiveMessage {
+    type: messageType;
+    args?: argsType;
+}
+
+export interface ReturnMessage {
+    type: 'success' | 'error';
+    panel?: Panel;
+    path?: (number | { x: number, y: number })[];
+}
 
 let generator: Generator;
 const panel = new Panel(0x018AF, 7, 7, 0, 6, 6, 0)
@@ -13,8 +25,10 @@ function handleGenerate(args: number[]) {
     }
     // generator.setGridSize(4, 4);
     generator.generate(panel, args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11], args[12], args[13], args[14], args[15], args[16], args[17]);
+    const path = phasePath(generator.Path, generator.Starts);
 
-    self.postMessage({type: 'success', panel});
+    const msg: ReturnMessage = {type: 'success', panel, path}
+    self.postMessage(msg);
 }
 
 function handleSetGridSize(args: number[]) {
@@ -29,25 +43,24 @@ function handleSetGridSize(args: number[]) {
     generator.setGridSize(args[0], args[1]);
 }
 
-// TODO: debug
-function handleGetPath() {
+// DEBUG only
+function handlePrintPath() {
     const solution = Array<string>(); //For debugging only
     for (let y = 0; y < panel.Height; y++) {
         const row = new Array<string>();
         for (let x = 0; x < panel.Width; x++) {
             if (generator['_path'].Contains(new Point(x, y))) {
                 row.push("xx");
-            } else if((panel.Grid[x][y] & 0x0400) === Decoration.Shape.Poly) {
+            } else if ((panel.Grid[x][y] & 0x0400) === Decoration.Shape.Poly) {
                 row.push("T ");
-            }
-            else row.push("  ");
+            } else row.push("  ");
         }
         solution.push(row.toString());
     }
     console.info(solution)
     for (let y = 0; y < panel.Height; y++) {
         for (let x = 0; x < panel.Width; x++) {
-            if((panel.Grid[x][y] & 0x0400) === Decoration.Shape.Poly) {
+            if ((panel.Grid[x][y] & 0x0400) === Decoration.Shape.Poly) {
                 let poly = panel.Grid[x][y] >> 16;
                 const array: number[][] = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
 
@@ -56,13 +69,13 @@ function handleGetPath() {
                     array[pos % 4][3 - Math.trunc(pos / 4)] = (poly & 1);
                     poly >>= 1;
                 }
-                console.info(array,(panel.Grid[x][y] >> 16).toString(16))
+                console.info(array, (panel.Grid[x][y] >> 16).toString(16))
             }
         }
     }
 }
 
-self.onmessage = function (event: { data: { type: messageType; args: argsType; }; }) {
+self.onmessage = function (event: { data: ReceiveMessage; }) {
     try {
         if (event.data.type == 'generate') {
             const args = event.data.args as number[];
@@ -81,8 +94,8 @@ self.onmessage = function (event: { data: { type: messageType; args: argsType; }
                 generator = new Generator(arg);
                 console.log('success')
             }
-        } else if (event.data.type == 'getPath') {
-            handleGetPath()
+        } else if (event.data.type == 'DEBUG_printPath') {
+            handlePrintPath()
         }
     } catch (e) {
         self.postMessage({type: 'error', message: e.message})
