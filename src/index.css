@@ -21,6 +21,43 @@ html, body {
     height: 100%;
     margin: 0 !important;
     padding: 0 !important;
+    font-family: 'Nunito', 'Varela Round', "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif
 }
 
+/* 全局滚动条样式 - 适配 Webkit 内核浏览器（Chrome、Edge、Safari） */
+::-webkit-scrollbar {
+    /* 滚动条整体宽度 */
+    width: 6px;    /* 垂直滚动条宽度 */
+    height: 6px;   /* 水平滚动条高度 */
+}
+
+/* 滚动条轨道（背景） */
+::-webkit-scrollbar-track {
+    background: #f5f5f5; /* 浅灰色轨道，可根据你的主题色调整 */
+    border-radius: 3px;  /* 轨道圆角 */
+}
+
+/* 滚动条滑块（可拖动的部分） */
+::-webkit-scrollbar-thumb {
+    background: #bdbdbd; /* 滑块默认颜色，对应 MUI 的 grey[400] */
+    border-radius: 3px;  /* 滑块圆角，和轨道保持一致更美观 */
+}
+
+/* 滑块 hover 状态 */
+::-webkit-scrollbar-thumb:hover {
+    background: #9e9e9e; /* hover 时加深颜色，对应 MUI 的 grey[500] */
+}
+
+/* 滑块 active 状态（点击拖动时） */
+::-webkit-scrollbar-thumb:active {
+    background: #757575; /* active 时更深，对应 MUI 的 grey[600] */
+}
+
+/* 全局滚动条样式 - 适配 Firefox 浏览器 */
+* {
+    /* 滚动条宽度：auto | thin | none */
+    scrollbar-width: thin;
+    /* 滚动条颜色：<滑块颜色> <轨道颜色> */
+    scrollbar-color: #bdbdbd #f5f5f5;
+}
 

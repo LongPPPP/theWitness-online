@@ -1,7 +1,7 @@
 import TheWitnessPuzzle from "../components/TheWitnessPuzzle/TheWitnessPuzzle.tsx";
 import {Decoration} from "../components/TheWitnessPuzzle/engine/generator/Panel.ts";
-import {useState} from "react";
-import PuzzleConfigProvider from "../components/TheWitnessPuzzle/context/PuzzleConfigProvider.tsx";
+import React, {useState} from "react";
+import NumberField from "../components/NumberField.tsx";
 
 const symbols = [
     Decoration.Shape.Exit, 1,
@@ -21,9 +21,9 @@ const symbols = [
 
 const symbols1 = [
     Decoration.Shape.Poly | Decoration.Shape.Can_Rotate | Decoration.Color.White, 2,
-    // Decoration.Shape.Poly | Decoration.Shape.Can_Rotate | Decoration.Shape.Negative, 1,
-    // Decoration.Shape.Stone | Decoration.Color.White, 3,
-    // Decoration.Shape.Stone | Decoration.Color.Black, 1,
+    Decoration.Shape.Poly | Decoration.Shape.Can_Rotate | Decoration.Color.White | Decoration.Shape.Negative, 1,
+    Decoration.Shape.Stone | Decoration.Color.White, 3,
+    Decoration.Shape.Stone | Decoration.Color.Black, 1,
     Decoration.Shape.Eraser | Decoration.Color.White, 1,
 ]
 //
@@ -34,8 +34,6 @@ const symbols1 = [
 //     Decoration.Shape.Eraser | Decoration.Color.White, 1
 // ];
 
-const EMPTY_START_POINTS = [];
-const EMPTY_END_POINTS = [];
 
 // generatorConfig={{
 //     seed: `${refresh}`,
@@ -48,30 +46,35 @@ export default function Test() {
     const [theme, setTheme] = useState('theme-light')
     const [enableDrag, setEnableDrag] = useState(false)
     const [generatorConfig, setGeneratorConfig] = useState(undefined)
-    const [b64c, setB64code] = useState(null)
+    const [b64c, setB64code] = useState("")
 
     return (
         <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column'}}>
-            <PuzzleConfigProvider>
-                <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
-                    <TheWitnessPuzzle
-                        theme={theme}
-                        defaultWidth={4}
-                        defaultHeight={4}
-                        generatorConfig={generatorConfig}
-                        showSolution={showSolution}
-                        enableResizeDrag={enableDrag}
-                        onPuzzleChange={(b64code) => {
-                            setB64code(b64code)
-                            console.info(b64code)
-                        }}
-                    />
-                    <TheWitnessPuzzle
-                        theme={'theme-dark'}
-                        pIDBase64={'AQAAAAkJAAAYrwMxFAIDAzsAAAUCAwc7AiMUAgcHOwBgAAIACDsAYAABCAA7OwAAAAE'}
-                    />
-                </div>
-            </PuzzleConfigProvider>
+
+            <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
+                <TheWitnessPuzzle
+                    theme={theme}
+                    defaultWidth={4}
+                    defaultHeight={4}
+                    generatorConfig={generatorConfig}
+                    showSolution={showSolution}
+                    enableResizeDrag={enableDrag}
+                    onPuzzleChange={(b64code) => {
+                        setB64code(b64code)
+                        console.info(b64code)
+                    }}
+                    PIDBase64={b64c}
+                />
+                <TheWitnessPuzzle
+                    theme={'theme-dark'}
+                    PIDBase64={'AQAAAAkJAAAYrwMxFAIDAzsAAAUCAwc7AiMUAgcHOwBgAAIACDsAYAABCAA7OwAAAAE'}
+                />
+            </div>
+            <NumberField
+              min={1}
+              max={15}
+              defaultValue={1}
+            />
             <div style={{width: '432px'}}>
                 <button onClick={() => {
                     setRefresh(Math.random())

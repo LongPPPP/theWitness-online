@@ -622,8 +622,6 @@ export class Panel {
         // (x,y,_endpoints) (1字节，1字节，4字节) dir在反序列化时候自动计算
         // _style 4字节
         // id 4字节
-        console.info(this)
-
         const symmetryBytes = 1;
         const colorModeBytes = 1;
         const flagsBytes = 1;
@@ -745,6 +743,13 @@ export class Panel {
         panel.decorationsOnly = decorationsOnly;
         panel.enableFlash = enableFlash;
 
+        for (let x = 0; x < panel.Width; x++) {
+            for (let y = 0; y < panel.Height; y++) {
+                if ((x & 1) === 0 && (y & 1) === 0) {
+                    panel.Grid[x][y] |= IntersectionFlags.INTERSECTION; // 设置交点标志
+                }
+            }
+        }
         // 解析cell，包括起点和终点
         while (buffer[offset] !== 59) {
             const cell =  (buffer[offset++] << 24) | (buffer[offset++] << 16) | (buffer[offset++] << 8) | buffer[offset++];
