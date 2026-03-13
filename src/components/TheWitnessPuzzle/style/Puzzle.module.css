@@ -3,7 +3,7 @@
     --line-primary: #8FF;
     --line-secondary: #FF2;
 
-    .theme-light {
+    .light {
         --background: #0A8;
         --outer-background: #113833;
         --foreground: #344;
@@ -18,7 +18,7 @@
         --active-color: #DDD;
     }
 
-    .theme-dark {
+    .dark {
         --background: #221;
         --outer-background: #070704;
         --foreground: #751;

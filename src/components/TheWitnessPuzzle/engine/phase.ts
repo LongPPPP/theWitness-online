@@ -7,7 +7,47 @@ import {logHexMatrix} from "./generator/utils/Debug_Tools.ts";
 import {type SVGType} from "./puzzle/svg";
 import type {SortedSet} from "./generator/utils/SortedSet.ts";
 
-function phaseColor(color: number): string {
+/**
+ * @param tetris 输入的panel中需要转换的tetris数字，eg:0x4700400 其中最后0400是固定的，用来表示他是个tetris
+ *
+ * */
+export function phasePolyShape(tetris:number) {
+    let poly = tetris >> 16;
+    let newPoly = 0; // 存储最终变换结果
+    const array: number[][] = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
+
+    // 遍历4x4网格的所有16个bit（位置0~15）
+    for (let pos = 0; pos < 16; pos++) {
+        array[pos % 4][3 - Math.trunc(pos / 4)] = (poly & 1);
+        poly = poly >> 1;
+    }
+    // console.info("==============对角线反转前==============")
+    // const beforeCopy = array.map(row => [...row]);
+    // console.info(beforeCopy,(decoration >> 16).toString(16));
+
+    // 对角线反转
+    for (let i = 0; i < 4; i++) {
+        for (let j = i + 1; j < 4; j++) {
+            // 交换 array[i][j] 和 array[j][i]
+            [array[i][j], array[j][i]] = [array[j][i], array[i][j]];
+        }
+    }
+    // console.info("==============对角线反转后==============")
+    // console.info(array,(decoration >> 16).toString(16))
+
+    // 转换为puzzle的格式
+    for (let j = 3; j >= 0; j--) {
+        const col = array[0][j] | (array[1][j] << 1) | (array[2][j] << 2) | (array[3][j] << 3);
+        newPoly = (newPoly << 4) | col;
+    }
+
+    if ((tetris & Decoration.Shape.Can_Rotate) !== 0) {
+        newPoly |= ROTATION_BIT
+    }
+    return newPoly
+}
+
+export function phaseColor(color: number): string {
     switch (color) {
         case Decoration.Color.None:
             return "transparent";
@@ -45,43 +85,13 @@ function phaseCell(decoration: number): GridCell {
     const shape: number = (decoration & ~0XF);
 
     if ((decoration & 0xF00) === Decoration.Shape.Poly) {
-        let poly = decoration >> 16;
-        let newPoly = 0; // 存储最终变换结果
-        const array: number[][] = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
 
-        // 遍历4x4网格的所有16个bit（位置0~15）
-        for (let pos = 0; pos < 16; pos++) {
-            array[pos % 4][3 - Math.trunc(pos / 4)] = (poly & 1);
-            poly = poly >> 1;
-        }
-        // console.info("==============对角线反转前==============")
-        // const beforeCopy = array.map(row => [...row]);
-        // console.info(beforeCopy,(decoration >> 16).toString(16));
-
-        // 对角线反转
-        for (let i = 0; i < 4; i++) {
-            for (let j = i + 1; j < 4; j++) {
-                // 交换 array[i][j] 和 array[j][i]
-                [array[i][j], array[j][i]] = [array[j][i], array[i][j]];
-            }
-        }
-        // console.info("==============对角线反转后==============")
-        // console.info(array,(decoration >> 16).toString(16))
-
-        // 转换为puzzle的格式
-        for (let j = 3; j >= 0; j--) {
-            const col = array[0][j] | (array[1][j] << 1) | (array[2][j] << 2) | (array[3][j] << 3);
-            newPoly = (newPoly << 4) | col;
-        }
 
         let type: SVGType = 'poly'
-        if ((decoration & Decoration.Shape.Can_Rotate) !== 0) {
-            newPoly |= ROTATION_BIT
-        }
         if ((decoration & Decoration.Shape.Negative) !== 0) {
             type = 'ylop'
         }
-        return {type: type, polyshape: newPoly, color: color}
+        return {type: type, polyshape: phasePolyShape(decoration), color: color}
     }
 
     switch (shape) {
@@ -91,12 +101,14 @@ function phaseCell(decoration: number): GridCell {
             return {type: 'star', color: color};
         case Decoration.Shape.Eraser:
             return {type: 'nega', color: color};
-        case (Decoration.Shape.Triangle | 0x10000):
+        case (Decoration.Shape.Triangle1):
             return {type: 'triangle', count: 1, color: color};
-        case (Decoration.Shape.Triangle | 0x20000):
+        case (Decoration.Shape.Triangle2):
             return {type: 'triangle', count: 2, color: color};
-        case (Decoration.Shape.Triangle | 0x30000):
+        case (Decoration.Shape.Triangle3):
             return {type: 'triangle', count: 3, color: color};
+        case (Decoration.Shape.Triangle4):
+            return {type: 'triangle', count: 4, color: color};
         default:
             break;
     }
@@ -112,9 +124,11 @@ function phaseLine(decoration: number): LineCell {
     const line: number = (decoration & ~0XF);
 
     switch (line) {
+        case Decoration.Shape.Gap:
         case Decoration.Shape.Gap_Row:
         case Decoration.Shape.Gap_Column:
             return {type: 'line', line: 0, gap: GAP_BREAK};
+        case Decoration.Shape.Dot:
         case Decoration.Shape.Dot_Intersection:
         case Decoration.Shape.Dot_Column:
         case Decoration.Shape.Dot_Row:

@@ -27,7 +27,8 @@ import React, {useEffect, useState} from "react";
 import {usePuzzleConfig} from "./TheWitnessPuzzle/context/puzzleConfigContext.ts";
 import type {PuzzleConfig} from "./TheWitnessPuzzle/engine/puzzle/puzzle.ts";
 import {type ThemeMode, useThemeMode} from "./hooks/useThemeMode.ts";
-import { PrimaryButton } from '@/components/buttons';
+import {PrimaryButton} from '@/components/buttons';
+import {useLocation, useNavigate} from "react-router-dom";
 
 const BootstrapTooltip = styled(({className, ...props}: TooltipProps) => (
 	<Tooltip {...props} arrow classes={{popper: className}}/>
@@ -129,13 +130,38 @@ const VolumeControl = ({value, onVolumeChange}: {
 	);
 };
 
+type ValidRouteKey = keyof typeof PAGE_CONFIG;
+const PAGE_CONFIG = {
+	'/': {
+		title: '',
+	},
+	'/editor': {
+		title: 'Editor',
+	},
+	'/randomizer': {
+		title: 'Randomizer',
+	},
+} as const;
+
+const getSafePageConfig = (pathname: string): { title: string } => {
+	// 第一步：类型守卫 - 检查路径是否在合法路由中
+	if (Object.prototype.hasOwnProperty.call(PAGE_CONFIG, pathname)) {
+		return PAGE_CONFIG[pathname as ValidRouteKey];
+	}
+	// 第二步：兜底返回默认配置
+	return PAGE_CONFIG['/editor'];
+};
+
 export default function MultiPaperNav() {
 	const [open, setOpen] = useState<boolean>(false);
 	const [endHint, setEndHint] = useState<boolean>(true);
 	const [volume, setVolume] = useState(1);
 	const [sensitivity, setSensitivity] = useState(0.7);
 	const {setConfig} = usePuzzleConfig();
-	const { userSelectedMode,setMode } = useThemeMode();
+	const {userSelectedMode, setMode} = useThemeMode();
+	const location = useLocation();
+	const navigate = useNavigate();
+	const currentPageConfig = getSafePageConfig(location.pathname);
 
 	const handleClose = () => {
 		setOpen(false);
@@ -189,8 +215,7 @@ export default function MultiPaperNav() {
 						fontWeight: 'bold',
 						color: (theme) => theme.palette.text.primary,
 					}}
-				>Randomizer - V1.0
-				</Typography>
+				>{currentPageConfig.title}</Typography>
 
 				<BootstrapTooltip title="GitHub repository" arrow>
 					<PrimaryButton
@@ -226,12 +251,12 @@ export default function MultiPaperNav() {
 
 					<Typography variant="caption" sx={{width: '100%', margin: "16px 0 8px 0"}}>Mode</Typography>
 					<ToggleButtonGroup color="primary" value={userSelectedMode} onChange={handleThemeChange} exclusive fullWidth>
-						<CustomToggleButton value='light' aria-label='light' onClick={()=> setMode('light')}>
+						<CustomToggleButton value='light' aria-label='light' onClick={() => setMode('light')}>
 							<LightModeOutlinedIcon fontSize="small" sx={{paddingRight: '4px'}}/>
 							Light</CustomToggleButton>
-						<CustomToggleButton value='system' aria-label='system' onClick={()=> setMode('system')}>
+						<CustomToggleButton value='system' aria-label='system' onClick={() => setMode('system')}>
 							System</CustomToggleButton>
-						<CustomToggleButton value='dark' aria-label='dark' onClick={()=> setMode('dark')}>
+						<CustomToggleButton value='dark' aria-label='dark' onClick={() => setMode('dark')}>
 							<BedtimeIcon fontSize="small" sx={{paddingRight: '4px'}}/>
 							Dark</CustomToggleButton>
 					</ToggleButtonGroup>

@@ -1,10 +1,12 @@
 import "./App.css"
-import Randomizer from "./pages/Randomizer.tsx";
 import PuzzleConfigProvider from "./components/TheWitnessPuzzle/context/PuzzleConfigProvider.tsx";
 import MultiPaperNav from "./components/MultiPaperNav.tsx";
 import {Box, CssBaseline} from "@mui/material";
 import {ThemeModeProvider} from "./components/contexts/ThemeContext.tsx";
-import Test from "./pages/Test.tsx";
+import Editor from "@/pages/Editor.tsx";
+import Randomizer from "@/pages/Randomizer.tsx";
+import {BrowserRouter as Router, Route, Routes} from "react-router-dom";
+import Homepage from "@/pages/Homepage.tsx";
 
 const consoleError = console.error;
 const consoleWarn = console.warn
@@ -60,20 +62,25 @@ function setLogLevel(level) {
 
 setLogLevel('info')
 
-
 function App() {
 	return (
 		<ThemeModeProvider>
 			<PuzzleConfigProvider>
 				<CssBaseline/>
-				<MultiPaperNav/>
-				<Box display={'flex'} minHeight={'100vh'} paddingTop={'44px'}>
-					{/*<BrowserSupportChecker/>*/}
-					{/*<Challenge/>*/}
-					<Randomizer/>
-					{/*<Test/>*/}
-					{/*<MazeGenerator2/>*/}
-				</Box>
+				<Router>
+					{/* 导航栏全局显示 */}
+					<MultiPaperNav/>
+					<Box display={'flex'} minHeight={'100vh'} paddingTop={'44px'}>
+						{/* 路由匹配区域 */}
+						<Routes>
+							<Route path="/" element={<Homepage/>}/>
+							<Route path="/randomizer" element={<Randomizer/>}/>
+							<Route path="/editor" element={<Editor/>}/>
+							{/* 404 路由（可选） */}
+							<Route path="*" element={<Editor/>}/>
+						</Routes>
+					</Box>
+				</Router>
 			</PuzzleConfigProvider>
 		</ThemeModeProvider>
 	)

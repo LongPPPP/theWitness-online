@@ -496,7 +496,7 @@ export default function Randomizer() {
 				<Divider component="div"/>
 				<Stack flex={1} alignItems="center" justifyContent="center">
 					<TheWitnessPuzzle
-						theme={`theme-${mode}`}
+						theme={mode}
 						defaultWidth={4}
 						defaultHeight={4}
 						generatorConfig={generatorConfig}

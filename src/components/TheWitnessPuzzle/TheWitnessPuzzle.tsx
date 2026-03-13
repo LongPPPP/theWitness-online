@@ -22,7 +22,7 @@ export interface GeneratorConfig {
 interface Props {
 	defaultWidth?: number;
 	defaultHeight?: number;
-	theme?: 'theme-light' | 'theme-dark',
+	theme?: 'light' | 'dark',
 	enableResizeDrag?: boolean,
 	outerBackgroundColor?: string,
 	backgroundColor?: string,
@@ -37,6 +37,7 @@ type DragPosition = {
 	y: number;
 }
 
+// TODO: 改变为修改panel而不是puzzle
 // All puzzle elements remain fixed, the edge you're dragging is where the new
 // row/column is added. The endpoint will try to stay fixed, but may be re-oriented.
 // In symmetry mode, we will preserve symmetry and try to guess how best to keep start
@@ -257,7 +258,7 @@ const TheWitnessPuzzle = (
 		defaultHeight = 3,
 		outerBackgroundColor,
 		backgroundColor,
-		theme = 'theme-light',
+		theme = 'light',
 		enableResizeDrag = false,
 		showSolution = 'none',
 		generatorConfig = undefined,
@@ -375,6 +376,19 @@ const TheWitnessPuzzle = (
 		}
 	}, [backgroundColor, outerBackgroundColor]);
 
+	// 当puzzle变化的时候重新绘制puzzle
+	useEffect(() => {
+		if (!puzzle) return;
+		draw(puzzle, uuid)
+
+		if (onPuzzleChange && panel.current) {
+			const newCode = panel.current.serialize();
+			prvBase64.current = newCode;
+
+			onPuzzleChange(newCode);
+		}
+	}, [onPuzzleChange, puzzle, uuid])
+
 	// 显示 solution
 	useEffect(() => {
 		if (!puzzle) return;
@@ -399,19 +413,6 @@ const TheWitnessPuzzle = (
 			}
 		}
 	}, [puzzle, showSolution])
-
-	// 当puzzle变化的时候重新绘制puzzle
-	useEffect(() => {
-		if (!puzzle) return;
-		draw(puzzle, uuid)
-
-		if (onPuzzleChange && panel.current) {
-			const newCode = panel.current.serialize();
-			prvBase64.current = newCode;
-
-			onPuzzleChange(newCode);
-		}
-	}, [onPuzzleChange, puzzle, uuid])
 
 	// 当config变化的时候设置puzzle的config
 	useEffect(() => {
@@ -474,7 +475,8 @@ const TheWitnessPuzzle = (
 			while (Math.abs(dx) >= xLim) {
 				const drag = (elemId.includes('right') ? 'right' : 'left');
 				if (!resizePuzzle(xScale * Math.sign(dx), 0, drag, puzzle)) break;
-				draw(puzzle, uuid);
+				draw(puzzle, uuid); // 改称setPuzzle试试看？
+				// setPuzzle(phasePuzzle(panel.current))
 				width.current += xScale * Math.sign(dx) / 2; // 需要除以二（原本算上道路了）
 				dx -= Math.sign(dx) * xLim;
 				dragging.current.x = newDragging.x;
@@ -483,7 +485,8 @@ const TheWitnessPuzzle = (
 			while (Math.abs(dy) >= yLim) {
 				const drag = (elemId.includes('top') ? 'top' : 'bottom');
 				if (!resizePuzzle(0, yScale * Math.sign(dy), drag, puzzle)) break;
-				draw(puzzle, uuid);
+				draw(puzzle, uuid); // 改称setPuzzle试试看？
+				// setPuzzle(puzzle)
 				height.current += yScale * Math.sign(dy) / 2;  // 需要除以二（原本算上道路了）
 				dy -= Math.sign(dy) * yLim;
 				dragging.current.y = newDragging.y;
@@ -502,7 +505,7 @@ const TheWitnessPuzzle = (
 		// 添加事件监听器
 		document.addEventListener('pointermove', dragMove);
 		document.addEventListener('pointerup', dragEnd);
-	}, [puzzle, uuid]); // 添加必要的依赖项
+	}, [puzzle]); // 添加必要的依赖项
 	// 显示 drag size svg
 	const sizeDrags = useMemo(() => {
 		if (enableResizeDrag) {
