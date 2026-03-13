@@ -505,7 +505,7 @@ const TheWitnessPuzzle = (
 		// 添加事件监听器
 		document.addEventListener('pointermove', dragMove);
 		document.addEventListener('pointerup', dragEnd);
-	}, [puzzle]); // 添加必要的依赖项
+	}, [puzzle, uuid]); // 添加必要的依赖项
 	// 显示 drag size svg
 	const sizeDrags = useMemo(() => {
 		if (enableResizeDrag) {
