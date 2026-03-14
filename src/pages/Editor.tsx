@@ -41,7 +41,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import CloseIcon from "@mui/icons-material/Close";
 
 
-// =================================== Components-1 ===================================
+// =================================== Components-LoadPuzzleDialog ===================================
 
 interface SavedPuzzle {
 	name: string;
@@ -89,7 +89,7 @@ function LoadPuzzleDialog({open, onClose, onConfirm, theme}: LoadPuzzleDialogPro
 			<Stack direction="row">
 				<DialogTitle fontWeight="bold">Load Saved Puzzle</DialogTitle>
 				<Box sx={{flexGrow: 1}}/>
-				<IconButton onClick={onClose} sx={{marginRight:'8px'}} disableRipple>
+				<IconButton onClick={onClose} sx={{marginRight: '8px'}} disableRipple>
 					<CloseIcon sx={{color: (theme) => theme.palette.text.primary}}/>
 				</IconButton>
 			</Stack>
@@ -286,10 +286,12 @@ export default function Editor() {
 	const [symbol, setSymbol] = useState<Symbol>(symbolList[0]);
 	const [color, setColor] = useState<number>(colorList[0]);
 	const [code, setCode] = useState<string>(null);
-	const [manuallySolve, setManuallySolve] = useState<boolean>(false);
 	const [puzzleName, setPuzzleName] = useState("New Puzzle");
 	const [puzzleStyle, setPuzzleStyle] = useState("default");
 	const [isLoadDialogOpen, setIsLoadDialogOpen] = useState(false);
+	const [manuallySolve, setManuallySolve] = useState<boolean>(false);
+	const [autoSolve, setAutoSolve] = useState<boolean>(false);
+
 	const {mode} = useThemeMode();
 
 	const onElementClicked = useCallback((e: PointerEvent, x: number, y: number) => {
@@ -429,7 +431,7 @@ export default function Editor() {
 		}
 	}
 
-	const handleCheckBoxChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+	const handleManuallySolve = (event: React.ChangeEvent<HTMLInputElement>) => {
 		if (event.target.checked) {
 			setManuallySolve(true)
 		} else {
@@ -437,8 +439,12 @@ export default function Editor() {
 		}
 	}
 
-	const handlePuzzleChange = useCallback(() => {
+	const handlePuzzleChange = useCallback((code: string) => {
 		if (!divRef.current) return;
+		// 更新迷宫code和panel
+		panel.current = Panel.deserialize(code);
+		setCode(code);
+
 		const divElement = divRef.current;
 		const puzzleElement = divElement.querySelector('[id^="puzzle"]');
 
@@ -452,17 +458,17 @@ export default function Editor() {
 		// 手动解迷宫的时候不添加这些玩意
 		if (manuallySolve) return;
 
-		//
 		let handlePointerDown: (e: PointerEvent) => void = () => {
 		};
 		// 恢复追加rect元素的逻辑
+		const p = panel.current;
 		let xPos = 40;
 		// 外层循环：x方向（4*2+1 = 9次）
-		for (let x = 0; x < 4 * 2 + 1; x++) {
+		for (let x = 0; x < p.Width; x++) {
 			let yPos = 40;
 			const width = x % 2 === 0 ? 24 : 58;
 			// 内层循环：y方向（4*2+1 = 9次）
-			for (let y = 0; y < 4 * 2 + 1; y++) {
+			for (let y = 0; y < p.Height; y++) {
 				const height = y % 2 === 0 ? 24 : 58;
 				// 创建SVG的rect元素（注意：必须用createElementNS指定SVG命名空间）
 				const rect = createElement('rect');
@@ -508,6 +514,10 @@ export default function Editor() {
 			createdRects.current = [];
 		};
 	}, [onElementClicked, manuallySolve]);
+
+	const handleSolutionFound = useCallback((count: number) => {
+		console.info('一共' + count + '种解法')
+	}, [])
 
 	const handleSave = () => {
 		const newSave: SavedPuzzle = {
@@ -635,6 +645,9 @@ export default function Editor() {
 							enableResizeDrag
 							onPuzzleChange={handlePuzzleChange}
 							PIDBase64={code}
+							showSolution={autoSolve}
+							solutionIndex={0}
+							onSolutionsFound={handleSolutionFound}
 						/>
 					</div>
 					<CustomToggleButtonGroup
@@ -697,8 +710,10 @@ export default function Editor() {
 				/>
 				{/*底部功能栏*/}
 				<Stack direction="row">
-					<FormControlLabel control={<Checkbox checked={manuallySolve} onChange={handleCheckBoxChange}/>} label="Solve Maunally"/>
-					<TextButton color="success" sx={{fontWeight: 'bolder'}}>Solve Automatically</TextButton>
+					<FormControlLabel control={<Checkbox checked={manuallySolve} onChange={handleManuallySolve}/>}
+														label="Solve Maunally"/>
+					<TextButton color="success" sx={{fontWeight: 'bolder'}} onClick={() => setAutoSolve(prv => !prv)}>Solve
+						Automatically</TextButton>
 				</Stack>
 			</Stack>
 		</Paper>

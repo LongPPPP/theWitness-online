@@ -438,7 +438,7 @@ const typeMap = {
 } as const;
 export default function Randomizer() {
 	const savedSymbols = useRef<number[]>([]);
-	const [showSolution, setShowSolution] = useState<'none' | 'all' | 'single'>('none');
+	const [showSolution, setShowSolution] = useState<boolean>(false);
 	const [generatorConfig, setGeneratorConfig] = useState({seed: 'x', symbols: []})
 	const {mode} = useThemeMode()
 	const {leftWidth, handleDragStart} = useResizablePanel(330, 0.2, 0.5);
@@ -479,11 +479,11 @@ export default function Randomizer() {
 			<Paper sx={{flex: 1, flexDirection: "column", display: "flex"}}>
 				<Stack sx={{width: '100%', padding: '8px', gap: '8px'}} direction="row">
 					<TextButton variant="contained" size="medium" color="success" onClick={() => {
-						setShowSolution('none')
+						setShowSolution(false)
 						setGeneratorConfig({seed: Math.random().toString(), symbols: savedSymbols.current});
 					}}>Generate</TextButton>
 					<TextButton variant="contained" size="medium" onClick={() => {
-						setShowSolution(showSolution === 'none' ? 'single' : 'none')
+						setShowSolution(prevState => !prevState)
 					}}>Solution</TextButton>
 					{/*<TextField*/}
 					{/*	error*/}
@@ -501,6 +501,7 @@ export default function Randomizer() {
 						defaultHeight={4}
 						generatorConfig={generatorConfig}
 						showSolution={showSolution}
+						solutionIndex={0}
 						enableResizeDrag={true}
 					/>
 				</Stack>
