@@ -80,6 +80,8 @@ const CustomAppBar = styled(AppBar)(({theme}) => ({
 	boxShadow: 'none',
 	borderBottom: `1px solid ${theme.palette.divider}`,
 	zIndex: theme.zIndex.drawer - 1,
+	backdropFilter: 'blur(12px)',
+	WebkitBackdropFilter: 'blur(12px)',
 
 	'& .MuiToolbar-root': {
 		minHeight: '44px',

@@ -470,7 +470,7 @@ export default function Randomizer() {
 		<Stack direction="row" flex={1}>
 			{/*left*/}
 			<div
-				style={{height: 'calc(100vh - 44px)', width: `${leftWidth}px`, flexShrink: 0}}>
+				style={{height: '100%', width: `${leftWidth}px`, flexShrink: 0}}>
 				<ElementSelectPanel onElementChange={handleSymbol}/>
 			</div>
 			{/*drag*/}

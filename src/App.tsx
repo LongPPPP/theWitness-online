@@ -5,7 +5,7 @@ import {Box, CssBaseline} from "@mui/material";
 import {ThemeModeProvider} from "./components/contexts/ThemeContext.tsx";
 import Editor from "@/pages/Editor.tsx";
 import Randomizer from "@/pages/Randomizer.tsx";
-import {BrowserRouter as Router, Route, Routes} from "react-router-dom";
+import {BrowserRouter as Router, Route, Routes, useLocation} from "react-router-dom";
 import Homepage from "@/pages/Homepage.tsx";
 
 const consoleError = console.error;
@@ -62,24 +62,40 @@ function setLogLevel(level) {
 
 setLogLevel('info')
 
+function AppContent() {
+	// 现在 useLocation 在 Router 内部，不会报错了
+	const location = useLocation();
+	const isHomepage = location.pathname === '/';
+
+	return (
+		<>
+			{/* 导航栏全局显示 */}
+			<MultiPaperNav/>
+			{/* 动态设置 paddingTop */}
+			<Box
+				display={'flex'}
+				minHeight={'100vh'}
+				paddingTop={isHomepage ? 0 : '44px'}
+				position={isHomepage ? 'relative' : 'static'}
+			>
+				<Routes>
+					<Route path="/" element={<Homepage/>}/>
+					<Route path="/randomizer" element={<Randomizer/>}/>
+					<Route path="/editor" element={<Editor/>}/>
+					<Route path="*" element={<Editor/>}/>
+				</Routes>
+			</Box>
+		</>
+	);
+}
+
 function App() {
 	return (
 		<ThemeModeProvider>
 			<PuzzleConfigProvider>
 				<CssBaseline/>
 				<Router>
-					{/* 导航栏全局显示 */}
-					<MultiPaperNav/>
-					<Box display={'flex'} minHeight={'100vh'} paddingTop={'44px'}>
-						{/* 路由匹配区域 */}
-						<Routes>
-							<Route path="/" element={<Homepage/>}/>
-							<Route path="/randomizer" element={<Randomizer/>}/>
-							<Route path="/editor" element={<Editor/>}/>
-							{/* 404 路由（可选） */}
-							<Route path="*" element={<Editor/>}/>
-						</Routes>
-					</Box>
+					<AppContent/>
 				</Router>
 			</PuzzleConfigProvider>
 		</ThemeModeProvider>

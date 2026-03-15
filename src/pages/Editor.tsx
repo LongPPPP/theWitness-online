@@ -39,7 +39,8 @@ import SaveIcon from '@mui/icons-material/Save';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CloseIcon from "@mui/icons-material/Close";
-
+import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
+import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 
 // =================================== Components-LoadPuzzleDialog ===================================
 
@@ -291,6 +292,9 @@ export default function Editor() {
 	const [isLoadDialogOpen, setIsLoadDialogOpen] = useState(false);
 	const [manuallySolve, setManuallySolve] = useState<boolean>(false);
 	const [autoSolve, setAutoSolve] = useState<boolean>(false);
+	const [isSolving, setIsSolving] = useState<boolean>(false);
+	const [solutionIndex, setSolutionIndex] = useState<number>(0);
+	const [solutionsCount, setSolutionsCount] = useState<number>(0);
 
 	const {mode} = useThemeMode();
 
@@ -439,6 +443,23 @@ export default function Editor() {
 		}
 	}
 
+	const handleAutoSolve = () => {
+		if (autoSolve === false) {
+			setIsSolving(true);
+			setSolutionIndex(0); // 开启时重置索引
+		}
+		setManuallySolve(false);
+		setAutoSolve(prv => !prv);
+	};
+
+	const handlePrevSolution = () => {
+		setSolutionIndex(prev => (prev > 0 ? prev - 1 : solutionsCount - 1));
+	};
+
+	const handleNextSolution = () => {
+		setSolutionIndex(prev => (prev < solutionsCount - 1 ? prev + 1 : 0));
+	};
+
 	const handlePuzzleChange = useCallback((code: string) => {
 		if (!divRef.current) return;
 		// 更新迷宫code和panel
@@ -455,8 +476,8 @@ export default function Editor() {
 		createdRects.current.forEach(rect => rect.remove());
 		createdRects.current = [];
 
-		// 手动解迷宫的时候不添加这些玩意
-		if (manuallySolve) return;
+		// 手动解迷宫或者自动解迷宫的时候不添加这些玩意
+		if (manuallySolve || autoSolve) return;
 
 		let handlePointerDown: (e: PointerEvent) => void = () => {
 		};
@@ -513,10 +534,13 @@ export default function Editor() {
 			// 清空缓存
 			createdRects.current = [];
 		};
-	}, [onElementClicked, manuallySolve]);
+	}, [manuallySolve, autoSolve, onElementClicked]);
 
 	const handleSolutionFound = useCallback((count: number) => {
-		console.info('一共' + count + '种解法')
+		setIsSolving(false)
+		setSolutionsCount(count);
+		// 如果当前索引越界，重置为 0
+		setSolutionIndex(curr => curr >= count ? 0 : curr);
 	}, [])
 
 	const handleSave = () => {
@@ -646,7 +670,7 @@ export default function Editor() {
 							onPuzzleChange={handlePuzzleChange}
 							PIDBase64={code}
 							showSolution={autoSolve}
-							solutionIndex={0}
+							solutionIndex={solutionIndex}
 							onSolutionsFound={handleSolutionFound}
 						/>
 					</div>
@@ -712,8 +736,23 @@ export default function Editor() {
 				<Stack direction="row">
 					<FormControlLabel control={<Checkbox checked={manuallySolve} onChange={handleManuallySolve}/>}
 														label="Solve Maunally"/>
-					<TextButton color="success" sx={{fontWeight: 'bolder'}} onClick={() => setAutoSolve(prv => !prv)}>Solve
-						Automatically</TextButton>
+					<TextButton color="success" sx={{fontWeight: 'bolder'}} onClick={handleAutoSolve} disabled={isSolving}>
+						{autoSolve ? "Hide Solutions" : "Solve Automatically"}
+					</TextButton>
+					{/* --- 新增：解法切换控件 --- */}
+					{autoSolve && solutionsCount > 0 && (
+						<Stack direction="row" alignItems="center" sx={{ml: 2, bgcolor: 'action.hover', borderRadius: 2, px: 1}}>
+							<IconButton size="small" onClick={handlePrevSolution}>
+								<NavigateBeforeIcon fontSize="small"/>
+							</IconButton>
+							<Typography variant="body2" sx={{mx: 1, minWidth: '80px', textAlign: 'center', fontWeight: 'bold'}}>
+								{solutionsCount > 0 ? `${solutionIndex + 1} / ${solutionsCount}` : "No Solution"}
+							</Typography>
+							<IconButton size="small" onClick={handleNextSolution}>
+								<NavigateNextIcon fontSize="small"/>
+							</IconButton>
+						</Stack>
+					)}
 				</Stack>
 			</Stack>
 		</Paper>

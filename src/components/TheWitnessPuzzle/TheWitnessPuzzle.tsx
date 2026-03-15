@@ -149,6 +149,10 @@ const TheWitnessPuzzle = (
 	const dragging = useRef<DragPosition | null>(null);
 	const prvBase64 = useRef<string>(null); // 防止传出的base64code再传入重复触发更新，导致死循环
 	const generatorSolution = useRef<Array<(number | { x: number, y: number })>[]>(null);
+	const cachedSolutions = useRef<{
+		puzzle: Puzzle;
+		solutions: Array<(number | { x: number, y: number })[]>
+	} | null>(null);
 	const {config} = usePuzzleConfig();
 
 	// init puzzle
@@ -256,33 +260,46 @@ const TheWitnessPuzzle = (
 		}
 	}, [onPuzzleChange, puzzle, uuid])
 
-	// 当puzzle变化的时候计算并渲染solution （当showSolution为true才会计算和渲染）
-	// TODO 当puzzle没有变化的时候只有showSolution变化的时候不重新计算solution
+	// 负责计算和绘制Path逻辑
+	// showSolution为true才计算解，并且计算后，若showSolution一直变化但是puzzle没有变化，解不重复计算
 	useEffect(() => {
-		if(!puzzle) return;
+		if (!puzzle) return;
+
+		const puzzleElem = puzzleRef.current;
+
 		if (!showSolution) {
-			const puzzleElem = puzzleRef.current;
-			Utils.deleteElementsByClassName(puzzleElem, 'cursor')
-			Utils.deleteElementsByClassName(puzzleElem, 'end-hint')
-			Utils.deleteElementsByClassName(puzzleElem, 'line-1')
-			Utils.deleteElementsByClassName(puzzleElem, 'line-2')
-			Utils.deleteElementsByClassName(puzzleElem, 'line-3')
-			puzzle.clearLines()
-			return
-		}
-		
-		if(generatorSolution.current) {
-			PuzzleSolver.drawPath(puzzle, generatorSolution.current[0], puzzleRef.current)
-			onSolutionsFound?.(0);
-			return
+			Utils.deleteElementsByClassName(puzzleElem, 'cursor');
+			Utils.deleteElementsByClassName(puzzleElem, 'end-hint');
+			Utils.deleteElementsByClassName(puzzleElem, 'line-1');
+			Utils.deleteElementsByClassName(puzzleElem, 'line-2');
+			Utils.deleteElementsByClassName(puzzleElem, 'line-3');
+			puzzle.clearLines();
+			return;
 		}
 
-		const solutions = autoSolve(puzzle);
-		onSolutionsFound?.(solutions.length);
-		const idx = Math.min(Math.max(0, solutionIndex || 0), solutions.length - 1);
-		PuzzleSolver.drawPath(puzzle, solutions[idx], puzzleRef.current)
-		
-	}, [onSolutionsFound, puzzle, showSolution, solutionIndex]);
+		// 情况 A: 生成器预设路径
+		if (generatorSolution.current) {
+			PuzzleSolver.drawPath(puzzle, generatorSolution.current[0], puzzleElem);
+			onSolutionsFound?.(1);
+			return;
+		}
+
+		// 情况 B: 懒计算 —— 只在 showSolution=true 时才算，puzzle 没变就用缓存
+		if (cachedSolutions.current?.puzzle !== puzzle) {
+			console.info("正在计算谜题解法...");
+			cachedSolutions.current = {puzzle, solutions: autoSolve(puzzle)};
+		}
+
+		const solutions = cachedSolutions.current.solutions;
+		if (solutions.length > 0) {
+			onSolutionsFound?.(solutions.length);
+			const idx = Math.min(Math.max(0, solutionIndex || 0), solutions.length - 1);
+			PuzzleSolver.drawPath(puzzle, solutions[idx], puzzleElem);
+		} else {
+			onSolutionsFound?.(0);
+		}
+
+	}, [puzzle, showSolution, solutionIndex, onSolutionsFound]);
 
 	// 当config变化的时候设置puzzle的config
 	useEffect(() => {
