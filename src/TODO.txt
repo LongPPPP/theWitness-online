@@ -1,5 +1,7 @@
 1. 主菜单背景修改为the witness 背景图片（public路径下）,同时修改两个页面选择框为磨砂材质 ✅️ 2026/3/15/10:59
-2. Generator页面添加按钮切换到editor页面(通过url保存迷宫的code，然后editor自动加载迷宫)
-3. Editor页面添加导入按钮，实现输入code加载迷宫
+2. Randomizer页面添加按钮切换到editor页面(通过url保存迷宫的code，然后editor自动加载迷宫) ✅️ 2026/3/16/20:05
+3. Editor页面添加导入按钮或者有地方可以填入code，实现输入code加载迷宫 ✅️ 2026/3/16/16:37
 4. 迷宫的类型选择实现
-5. Editor页面拖动修改迷宫大小卡顿
+5. Editor页面拖动修改迷宫大小卡顿 ✅️ 2026/3/15/10:59
+6. MultiPaperNav 添加返回主菜单的按钮 ✅️ 2026/3/16/20:22
+7. Editor/Randomizer界面导出迷宫code到剪切板

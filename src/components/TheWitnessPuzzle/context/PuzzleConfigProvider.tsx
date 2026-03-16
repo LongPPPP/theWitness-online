@@ -4,7 +4,7 @@ import type {PuzzleConfig} from "../engine/puzzle/puzzle.ts";
 
 export default function PuzzleConfigProvider({children}) {
 	const [config, setConfig] = useState<PuzzleConfig>({
-		volume: 1,
+		volume: 0.5,
 		sensitivity: 0.7,
 		enableEndHints: true,
 		onSuccess: () => {

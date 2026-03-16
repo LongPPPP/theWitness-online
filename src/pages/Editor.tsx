@@ -41,6 +41,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import CloseIcon from "@mui/icons-material/Close";
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
+import InputIcon from '@mui/icons-material/Input';
 
 // =================================== Components-LoadPuzzleDialog ===================================
 
@@ -168,6 +169,52 @@ function LoadPuzzleDialog({open, onClose, onConfirm, theme}: LoadPuzzleDialogPro
 	);
 }
 
+// =================================== Components-ImportCodeDialog ===================================
+
+interface ImportCodeDialogProps {
+	open: boolean;
+	onClose: () => void;
+	onConfirm: (code: string) => void;
+}
+
+function ImportCodeDialog({ open, onClose, onConfirm }: ImportCodeDialogProps) {
+	const [inputCode, setInputCode] = useState("");
+
+	const handleConfirm = () => {
+		if (inputCode.trim()) {
+			onConfirm(inputCode.trim());
+			setInputCode("");
+			onClose();
+		}
+	};
+
+	return (
+		<Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+			<DialogTitle fontWeight="bold">Import Puzzle Code</DialogTitle>
+			<DialogContent dividers>
+				<Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
+					Paste the puzzle's Base64 code below to load it into the editor.
+				</Typography>
+				<TextField
+					fullWidth
+					multiline
+					rows={4}
+					placeholder="Paste code here..."
+					value={inputCode}
+					onChange={(e) => setInputCode(e.target.value)}
+					variant="outlined"
+					autoFocus
+				/>
+			</DialogContent>
+			<DialogActions sx={{ px: 3, py: 2 }}>
+				<TextButton onClick={onClose} color="inherit">Cancel</TextButton>
+				<TextButton onClick={handleConfirm} variant="contained" disabled={!inputCode.trim()}>
+					Import
+				</TextButton>
+			</DialogActions>
+		</Dialog>
+	);
+}
 // =================================== Editor ===================================
 
 type Symbol = SVGParams & { value: number }
@@ -290,6 +337,7 @@ export default function Editor() {
 	const [puzzleName, setPuzzleName] = useState("New Puzzle");
 	const [puzzleStyle, setPuzzleStyle] = useState("default");
 	const [isLoadDialogOpen, setIsLoadDialogOpen] = useState(false);
+	const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 	const [manuallySolve, setManuallySolve] = useState<boolean>(false);
 	const [autoSolve, setAutoSolve] = useState<boolean>(false);
 	const [isSolving, setIsSolving] = useState<boolean>(false);
@@ -569,10 +617,42 @@ export default function Editor() {
 		setCode(selected.code);
 		panel.current = Panel.deserialize(selected.code);
 	};
+	const handleImportConfirm = (importedCode: string) => {
+		try {
+			// 验证代码是否合法
+			const testPanel = Panel.deserialize(importedCode);
+			if (testPanel) {
+				panel.current = testPanel;
+				setCode(importedCode);
+				setPuzzleName("Imported Puzzle");
+				alert("Puzzle imported successfully!");
+			}
+		} catch (e) {
+			console.error("Failed to parse puzzle code:", e);
+			alert("Invalid puzzle code. Please check your input.");
+		}
+	};
 
 	useEffect(() => {
-		setCode("AQAAAAkJAAAYrwBgAAIIADsAYAABAAg7OwAAAAE=")
-		panel.current = Panel.deserialize("AQAAAAkJAAAYrwBgAAIIADsAYAABAAg7OwAAAAE=");
+		const params = new URLSearchParams(window.location.search);
+		const codeFromUrl = params.get('code');
+
+		let initialCode = "AQAAAAkJAAAYrwBgAAIIADsAYAABAAg7OwAAAAE="; // 默认空迷宫
+
+		if (codeFromUrl) {
+			try {
+				// 解码并验证
+				const decodedCode = decodeURIComponent(codeFromUrl);
+				Panel.deserialize(decodedCode); // 验证是否合法
+				initialCode = decodedCode;
+				setPuzzleName("Imported from Generator");
+			} catch (e) {
+				console.error("Invalid code in URL", e);
+			}
+		}
+
+		setCode(initialCode);
+		panel.current = Panel.deserialize(initialCode);
 	}, []);
 
 	useEffect(() => {
@@ -620,8 +700,14 @@ export default function Editor() {
 						</Tooltip>
 
 						<Tooltip title="Load Puzzle">
-							<IconButton onClick={handleLoad}>
+							<IconButton onClick={handleLoad} color="primary">
 								<FolderOpenIcon/>
+							</IconButton>
+						</Tooltip>
+
+						<Tooltip title="Import from Code">
+							<IconButton onClick={() => setIsImportDialogOpen(true)} color="success">
+								<InputIcon/>
 							</IconButton>
 						</Tooltip>
 
@@ -725,6 +811,11 @@ export default function Editor() {
 							</ToggleButton>
 						))}
 					</CustomToggleButtonGroup>
+					<ImportCodeDialog
+						open={isImportDialogOpen}
+						onClose={() => setIsImportDialogOpen(false)}
+						onConfirm={handleImportConfirm}
+					/>
 				</Stack>
 				<LoadPuzzleDialog
 					open={isLoadDialogOpen}

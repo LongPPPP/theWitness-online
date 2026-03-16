@@ -15,6 +15,8 @@ import {TextButton} from "@/components/buttons";
 import {BlackTooltip} from "@/components/tooltips";
 import {useThemeMode} from "@/components/hooks/useThemeMode.ts";
 import {useResizablePanel} from "@/components/hooks/useResizablePanel.ts";
+import EditIcon from '@mui/icons-material/Edit';
+import {useNavigate} from "react-router-dom";
 
 // ========================================================================================
 // 分割线组件（纯函数组件，无内部状态）
@@ -440,8 +442,10 @@ export default function Randomizer() {
 	const savedSymbols = useRef<number[]>([]);
 	const [showSolution, setShowSolution] = useState<boolean>(false);
 	const [generatorConfig, setGeneratorConfig] = useState({seed: 'x', symbols: []})
+	const [currentCode, setCurrentCode] = useState<string>(""); // 保存当前生成的代码
 	const {mode} = useThemeMode()
 	const {leftWidth, handleDragStart} = useResizablePanel(330, 0.2, 0.5);
+	const navigate = useNavigate();
 
 	const handleSymbol = useCallback((eList: ElementItem[]) => {
 		const symbol_map = new Map<number, number>();
@@ -466,6 +470,15 @@ export default function Randomizer() {
 		}
 	}, []);
 
+	// 处理跳转逻辑
+	const handleEditInEditor = () => {
+		if (!currentCode) return;
+		// 对 Base64 进行 URL 编码，防止特殊字符 (+, /, =) 破坏 URL 结构
+		const encodedCode = encodeURIComponent(currentCode);
+		navigate(`/editor?code=${encodedCode}`)
+		// 如果你使用了 react-router-dom，建议使用 navigate(`/editor?code=${encodedCode}`)
+	};
+
 	return (
 		<Stack direction="row" flex={1}>
 			{/*left*/}
@@ -485,6 +498,7 @@ export default function Randomizer() {
 					<TextButton variant="contained" size="medium" onClick={() => {
 						setShowSolution(prevState => !prevState)
 					}}>Solution</TextButton>
+					<TextButton variant="outlined" startIcon={<EditIcon />} onClick={handleEditInEditor} disabled={!currentCode}>Edit in Editor</TextButton>
 					{/*<TextField*/}
 					{/*	error*/}
 					{/*	id="puzzle-base64-field"*/}
@@ -503,6 +517,7 @@ export default function Randomizer() {
 						showSolution={showSolution}
 						solutionIndex={0}
 						enableResizeDrag={true}
+						onPuzzleChange={(code) => setCurrentCode(code)}
 					/>
 				</Stack>
 			</Paper>

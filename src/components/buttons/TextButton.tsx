@@ -8,6 +8,10 @@ const TextButton = styled(Button)<ButtonProps>(({theme, color = 'primary', varia
 		if (['primary', 'secondary', 'error', 'warning', 'info', 'success'].includes(colorProp)) {
 			return theme.palette[colorProp as keyof typeof theme.palette].main;
 		}
+
+		if (colorProp === 'inherit') {
+			return theme.palette.text.primary;
+		}
 		// 处理自定义 color（如 hex/rgb 字符串）
 		return colorProp;
 	};

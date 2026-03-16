@@ -29,6 +29,7 @@ import type {PuzzleConfig} from "./TheWitnessPuzzle/engine/puzzle/puzzle.ts";
 import {type ThemeMode, useThemeMode} from "./hooks/useThemeMode.ts";
 import {PrimaryButton} from '@/components/buttons';
 import {useLocation, useNavigate} from "react-router-dom";
+import HomeIcon from '@mui/icons-material/Home';
 
 const BootstrapTooltip = styled(({className, ...props}: TooltipProps) => (
 	<Tooltip {...props} arrow classes={{popper: className}}/>
@@ -157,7 +158,7 @@ const getSafePageConfig = (pathname: string): { title: string } => {
 export default function MultiPaperNav() {
 	const [open, setOpen] = useState<boolean>(false);
 	const [endHint, setEndHint] = useState<boolean>(true);
-	const [volume, setVolume] = useState(1);
+	const [volume, setVolume] = useState(0.5);
 	const [sensitivity, setSensitivity] = useState(0.7);
 	const {setConfig} = usePuzzleConfig();
 	const {userSelectedMode, setMode} = useThemeMode();
@@ -202,8 +203,20 @@ export default function MultiPaperNav() {
 	return (
 		<CustomAppBar position="fixed">
 			<Toolbar disableGutters>
-				<Stack direction="row" spacing={2}>
-
+				<Stack direction="row" spacing={1} sx={{ ml: 2, minWidth: '100px' }}>
+					{/* 仅在非主页显示返回按钮 */}
+					{location.pathname !== '/' && (
+						<BootstrapTooltip title="Return to Main Menu" arrow>
+							<PrimaryButton
+								disableRipple
+								color="primary"
+								size="medium"
+								onClick={() => navigate('/')}
+							>
+								<HomeIcon fontSize="small"/>
+							</PrimaryButton>
+						</BootstrapTooltip>
+					)}
 				</Stack>
 				<Typography
 					variant="h6"
