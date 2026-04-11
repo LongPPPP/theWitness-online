@@ -7,6 +7,7 @@ import Editor from "@/pages/Editor.tsx";
 import Randomizer from "@/pages/Randomizer.tsx";
 import {BrowserRouter as Router, Route, Routes, useLocation} from "react-router-dom";
 import Homepage from "@/pages/Homepage.tsx";
+import Test from "@/pages/Test.tsx";
 
 const consoleError = console.error;
 const consoleWarn = console.warn
@@ -82,7 +83,7 @@ function AppContent() {
 					<Route path="/" element={<Homepage/>}/>
 					<Route path="/randomizer" element={<Randomizer/>}/>
 					<Route path="/editor" element={<Editor/>}/>
-					<Route path="*" element={<Editor/>}/>
+					<Route path="*" element={<Test/>}/>
 				</Routes>
 			</Box>
 		</>

@@ -13,6 +13,7 @@ import SymbolSVG from "./SymbolSVG.tsx";
 import {usePuzzleConfig} from "./context/puzzleConfigContext.ts";
 import {resizePanel} from "@/components/TheWitnessPuzzle/engine/resizePanel.ts";
 
+
 // ==========================================================================
 interface ResizeHandlesProps {
 	enabled: boolean;
@@ -78,6 +79,8 @@ export interface GeneratorConfig {
 	symbols: number[];
 }
 
+export type PuzzleStyle = keyof typeof Panel.Symmetry;
+
 interface PuzzleProps {
 	defaultWidth?: number;
 	defaultHeight?: number;
@@ -92,6 +95,7 @@ interface PuzzleProps {
 	showSolution?: boolean;
 	solutionIndex?: number; // 外部传入显示第几个
 	onSolutionsFound?: (count: number) => void; // 求解后的回调
+	symmetry?: PuzzleStyle; // TODO：作用性存疑，在Editor种是使用code来设置迷宫的,不过在generator中倒是可以使用
 }
 
 type DragPosition = {
@@ -109,8 +113,36 @@ function autoSolve(puzzle: Puzzle) {
 
 }
 
-function createDefaultPanel(defaultWidth: number, defaultHeight: number) {
-	const panel = new Panel(0x018AF, defaultWidth * 2 + 1, defaultHeight * 2 + 1, defaultWidth * 2, 0, 0, defaultHeight * 2)
+/**
+ * 若symmetry含有Pillar，则必须保证width为偶数
+ * */
+function createPanel(width: number, height: number, symmetry: Panel.Symmetry) {
+	let [startX, startY] = [0, 0];
+	let [endX, endY] = [0, height * 2];
+	const isPillar =
+		symmetry === Panel.Symmetry.PillarParallel ||
+		symmetry === Panel.Symmetry.PillarHorizontal ||
+		symmetry === Panel.Symmetry.PillarVertical ||
+		symmetry === Panel.Symmetry.PillarRotational ||
+		symmetry === Panel.Symmetry.Pillar;
+
+	if (isPillar && width % 2 === 1) {
+		throw new Error('若symmetry含有Pillar，则必须保证width为偶数')
+	}
+
+	if (symmetry === Panel.Symmetry.Horizontal) {
+		[startX, startY] = [width * 2, 0]
+	} else if (isPillar) {
+		[startX, startY] = [width - 2, 0];
+		// 在旋转对称的时候使起点和终点错开放置
+		if(symmetry === Panel.Symmetry.PillarRotational) {
+			[endX, endY] = [width + 2, height * 2];
+		} else {
+			[endX, endY] = [width - 2, height * 2];
+		}
+
+	}
+	const panel = new Panel(0x018AF, width * 2 + 1, height * 2 + 1, startX, startY, endX, endY, symmetry)
 	for (let x = 0; x < panel.Width; x++) {
 		for (let y = 0; y < panel.Height; y++) {
 			if ((x & 1) === 0 && (y & 1) === 0) {
@@ -135,6 +167,7 @@ const TheWitnessPuzzle = (
 		PIDBase64,
 		solutionIndex,
 		onSolutionsFound,
+		symmetry = 'None',
 	}: PuzzleProps
 ) => {
 	const uuid = "puzzle_" + useId()
@@ -157,20 +190,21 @@ const TheWitnessPuzzle = (
 
 	// init puzzle
 	useEffect(() => {
+		const sym = Panel.Symmetry[symmetry as keyof typeof Panel.Symmetry];
 		if (PIDBase64) {
-			if (PIDBase64 === prvBase64.current) return; // 这里防止传出的code再穿入重复触发更新，导致死循环
+			if (PIDBase64 === prvBase64.current) return; // 这里防止传出的code再传入重复触发更新，导致死循环
 
 			try {
 				panel.current = Panel.deserialize(PIDBase64)
 			} catch (e) {
 				console.error("Invalid puzzle code:", e)
-				panel.current = createDefaultPanel(defaultWidth, defaultHeight)
+				panel.current = createPanel(defaultWidth, defaultHeight, sym)
 			}
 		} else {
-			panel.current = createDefaultPanel(defaultWidth, defaultHeight)
+			panel.current = createPanel(defaultWidth, defaultHeight, sym)
 		}
 		setPuzzle(phasePuzzle(panel.current))
-	}, [defaultHeight, defaultWidth, PIDBase64, uuid]);
+	}, [defaultHeight, defaultWidth, PIDBase64, symmetry, uuid]);
 
 	// init worker / if worker is not supported, then use generator in main process
 	useEffect(() => {
@@ -247,7 +281,7 @@ const TheWitnessPuzzle = (
 		}
 	}, [backgroundColor, outerBackgroundColor]);
 
-	// 当puzzle变化的时候重新绘制puzzle
+	// 当puzzle变化的时候重新绘制puzzle,并且调用onPuzzleChange
 	useEffect(() => {
 		if (!puzzle) return;
 		draw(puzzle, uuid)
@@ -283,6 +317,9 @@ const TheWitnessPuzzle = (
 			onSolutionsFound?.(1);
 			return;
 		}
+
+		// ✅ 修复：求解前清除手动解谜留下的线段状态
+		puzzle.clearLines();
 
 		// 情况 B: 懒计算 —— 只在 showSolution=true 时才算，puzzle 没变就用缓存
 		if (cachedSolutions.current?.puzzle !== puzzle) {

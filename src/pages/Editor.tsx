@@ -42,6 +42,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import InputIcon from '@mui/icons-material/Input';
+import IosShareIcon from '@mui/icons-material/IosShare';
 
 // =================================== Components-LoadPuzzleDialog ===================================
 
@@ -177,7 +178,7 @@ interface ImportCodeDialogProps {
 	onConfirm: (code: string) => void;
 }
 
-function ImportCodeDialog({ open, onClose, onConfirm }: ImportCodeDialogProps) {
+function ImportCodeDialog({open, onClose, onConfirm}: ImportCodeDialogProps) {
 	const [inputCode, setInputCode] = useState("");
 
 	const handleConfirm = () => {
@@ -192,7 +193,7 @@ function ImportCodeDialog({ open, onClose, onConfirm }: ImportCodeDialogProps) {
 		<Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
 			<DialogTitle fontWeight="bold">Import Puzzle Code</DialogTitle>
 			<DialogContent dividers>
-				<Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
+				<Typography variant="body2" sx={{mb: 2, color: 'text.secondary'}}>
 					Paste the puzzle's Base64 code below to load it into the editor.
 				</Typography>
 				<TextField
@@ -206,7 +207,7 @@ function ImportCodeDialog({ open, onClose, onConfirm }: ImportCodeDialogProps) {
 					autoFocus
 				/>
 			</DialogContent>
-			<DialogActions sx={{ px: 3, py: 2 }}>
+			<DialogActions sx={{px: 3, py: 2}}>
 				<TextButton onClick={onClose} color="inherit">Cancel</TextButton>
 				<TextButton onClick={handleConfirm} variant="contained" disabled={!inputCode.trim()}>
 					Import
@@ -215,6 +216,7 @@ function ImportCodeDialog({ open, onClose, onConfirm }: ImportCodeDialogProps) {
 		</Dialog>
 	);
 }
+
 // =================================== Editor ===================================
 
 type Symbol = SVGParams & { value: number }
@@ -262,15 +264,15 @@ const colorList = [
 ]
 
 const styleOptions = [
-	{value: 'default', label: 'Default'},
-	{value: 'h_sym', label: 'Horizontal Symmetry'},
-	{value: 'v_sym', label: 'Vertical Symmetry'},
-	{value: 'r_sym', label: 'Rotational Symmetry'},
-	{value: 'pillar', label: 'Pillar'},
-	{value: 'pillar_h', label: 'Pillar (H Symmetry)'},
-	{value: 'pillar_v', label: 'Pillar (V Symmetry)'},
-	{value: 'pillar_r', label: 'Pillar (R Symmetry)'},
-	{value: 'pillar_two', label: 'Pillar (Two Lines)'},
+	{value: 'None', label: 'Default'},
+	{value: 'Horizontal', label: 'Horizontal Symmetry'},
+	{value: 'Vertical', label: 'Vertical Symmetry'},
+	{value: 'Rotational', label: 'Rotational Symmetry'},
+	{value: 'Pillar', label: 'Pillar'},
+	{value: 'PillarHorizontal', label: 'Pillar (H Symmetry)'},
+	{value: 'PillarVertical', label: 'Pillar (V Symmetry)'},
+	{value: 'PillarRotational', label: 'Pillar (R Symmetry)'},
+	{value: 'PillarParallel', label: 'Pillar (Two Lines)'},
 ];
 
 const CustomToggleButtonGroup = styled(ToggleButtonGroup)(({theme}) => ({
@@ -324,6 +326,42 @@ const getColorName = (color: number): string => {
 	}
 }
 
+const createPanel = (width: number, height: number, symmetry: Panel.Symmetry) => {
+	let [startX, startY] = [0, 0];
+	let [endX, endY] = [0, height * 2];
+	const isPillar =
+		symmetry === Panel.Symmetry.PillarParallel   ||
+		symmetry === Panel.Symmetry.PillarHorizontal ||
+		symmetry === Panel.Symmetry.PillarVertical   ||
+		symmetry === Panel.Symmetry.PillarRotational ||
+		symmetry === Panel.Symmetry.Pillar;
+
+	if (isPillar && width % 2 === 1) {
+		throw new Error('若symmetry含有Pillar，则必须保证width为偶数')
+	}
+
+	if (symmetry === Panel.Symmetry.Horizontal) {
+		[startX, startY] = [width * 2, 0]
+	} else if (isPillar) {
+		[startX, startY] = [width - 2, 0];
+		// 在旋转对称的时候使起点和终点错开放置
+		if(symmetry === Panel.Symmetry.PillarRotational) {
+			[endX, endY] = [width + 2, height * 2];
+		} else {
+			[endX, endY] = [width - 2, height * 2];
+		}
+	}
+
+	const panel = new Panel(0x018AF, width * 2 + 1, height * 2 + 1, startX, startY, endX, endY, symmetry)
+	for (let x = 0; x < panel.Width; x++) {
+		for (let y = 0; y < panel.Height; y++) {
+			if ((x & 1) === 0 && (y & 1) === 0) {
+				panel.Grid[x][y] |= IntersectionFlags.INTERSECTION
+			}
+		}
+	}
+	return panel;
+}
 
 export default function Editor() {
 	const divRef = useRef<HTMLDivElement>(null);
@@ -335,7 +373,7 @@ export default function Editor() {
 	const [color, setColor] = useState<number>(colorList[0]);
 	const [code, setCode] = useState<string>(null);
 	const [puzzleName, setPuzzleName] = useState("New Puzzle");
-	const [puzzleStyle, setPuzzleStyle] = useState("default");
+	const [symmetry, setSymmetry] = useState("None");
 	const [isLoadDialogOpen, setIsLoadDialogOpen] = useState(false);
 	const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 	const [manuallySolve, setManuallySolve] = useState<boolean>(false);
@@ -608,7 +646,7 @@ export default function Editor() {
 	const handleDelete = () => {
 		setPuzzleName("New Puzzle")
 		setManuallySolve(false)
-		setPuzzleStyle("default")
+		setSymmetry("default")
 		setCode("AQAAAAkJAAAYrwBgAAIIADsAYAABAAg7OwAAAAE=")
 		panel.current = Panel.deserialize("AQAAAAkJAAAYrwBgAAIIADsAYAABAAg7OwAAAAE=");
 	};
@@ -632,6 +670,24 @@ export default function Editor() {
 			alert("Invalid puzzle code. Please check your input.");
 		}
 	};
+	const handleShare = useCallback(() => {
+		if (!code) {
+			alert("No puzzle code to share!");
+			return;
+		}
+		// 复制到剪贴板
+		navigator.clipboard.writeText(code)
+			.then(() => {
+				alert("Share link copied to clipboard successfully!");
+			})
+			.catch((err) => {
+				// 复制失败（如用户拒绝权限）时的降级提示
+				console.error("Failed to copy link:", err);
+				alert(
+					"Failed to copy link to clipboard.\nPlease manually copy this code:\n" + code
+				);
+			});
+	}, [code]);
 
 	useEffect(() => {
 		const params = new URLSearchParams(window.location.search);
@@ -660,6 +716,22 @@ export default function Editor() {
 		_symbol.current = symbol;
 	}, [color, symbol]);
 
+	useEffect(() => {
+		let w = Math.trunc((panel.current.Width - 1) / 2);
+		const h = Math.trunc((panel.current.Height - 1) / 2);
+		const sym = Panel.Symmetry[symmetry as keyof typeof Panel.Symmetry];
+		const isPillarSym =
+			sym === Panel.Symmetry.PillarParallel   ||
+			sym === Panel.Symmetry.PillarHorizontal ||
+			sym === Panel.Symmetry.PillarVertical   ||
+			sym === Panel.Symmetry.PillarRotational;
+		if(isPillarSym && w % 2 === 1) {
+			w += 1;
+		}
+		const newPanel = createPanel(w, h, sym);
+		setCode(newPanel.serialize());
+	}, [symmetry])
+
 	return (
 		<Paper sx={{width: '100%'}}>
 			<Stack sx={{height: '100%'}} alignItems="center" justifyContent="center">
@@ -678,10 +750,9 @@ export default function Editor() {
 					<FormControl variant="outlined" size="small" sx={{minWidth: 200}}>
 						<InputLabel>Puzzle Style</InputLabel>
 						<Select
-							disabled
-							value={puzzleStyle}
+							value={symmetry}
 							label="Puzzle Style"
-							onChange={(e) => setPuzzleStyle(e.target.value)}
+							onChange={(e) => setSymmetry(e.target.value)}
 						>
 							{styleOptions.map((option) => (
 								<MenuItem key={option.value} value={option.value}>
@@ -692,6 +763,7 @@ export default function Editor() {
 					</FormControl>
 					<Box sx={{flexGrow: 1}}/> {/* 占位符，将按钮推向右侧 */}
 					{/* 3. 功能按钮组 */}
+					<Divider orientation="vertical" flexItem sx={{mx: 2}}/>
 					<Stack direction="row" spacing={1}>
 						<Tooltip title="Save Puzzle">
 							<IconButton onClick={handleSave} color="primary">
@@ -706,8 +778,14 @@ export default function Editor() {
 						</Tooltip>
 
 						<Tooltip title="Import from Code">
-							<IconButton onClick={() => setIsImportDialogOpen(true)} color="success">
+							<IconButton onClick={() => setIsImportDialogOpen(true)}>
 								<InputIcon/>
+							</IconButton>
+						</Tooltip>
+
+						<Tooltip title="Share Puzzle By Code">
+							<IconButton onClick={handleShare}>
+								<IosShareIcon/>
 							</IconButton>
 						</Tooltip>
 

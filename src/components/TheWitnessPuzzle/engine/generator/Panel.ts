@@ -251,7 +251,6 @@ export enum IntersectionFlags {
 	DOT_LARGE = 0x8000,
 }
 
-
 export class Panel {
 	public symmetry: Panel.Symmetry;
 	// public pathWidth: number;
@@ -338,7 +337,7 @@ export class Panel {
 	public STYLE_FLAGS: number;// 用途未知
 
 
-	constructor(id: number, width: number, height: number, startX: number, startY: number, endX: number, endY: number) {
+	constructor(id: number, width: number, height: number, startX: number, startY: number, endX: number, endY: number, symmetry: Panel.Symmetry = Panel.Symmetry.None) {
 		this.id = id;
 		this._width = width;
 		this._height = height;
@@ -349,7 +348,7 @@ export class Panel {
 		// this._endpoints = [new Endpoint(endX, endY, Endpoint.Direction.UP, 4194305)];
 		this._startpoints = [];
 		this._endpoints = [];
-		this.symmetry = Panel.Symmetry.None;
+		this.symmetry = symmetry;
 		this._style = 1;
 		// this.pathWidth = 1;
 		this.colorMode = Panel.ColorMode.Default;
@@ -358,6 +357,12 @@ export class Panel {
 		//ReadIntersections();
 		this.SetGridSymbol(startX, startY, Decoration.Shape.Start, Decoration.Color.None);
 		this.SetGridSymbol(endX, endY, Decoration.Shape.Exit, Decoration.Color.None);
+		if (this.symmetry !== Panel.Symmetry.None) {
+			const s2 = this.get_sym_point(startX, startY)
+			const e2 = this.get_sym_point(endX, endY)
+			this.SetGridSymbol(s2.first, s2.second, Decoration.Shape.Start, Decoration.Color.None);
+			this.SetGridSymbol(e2.first, e2.second, Decoration.Shape.Exit, Decoration.Color.None);
+		}
 	}
 
 	public SetSymbol(x: number, y: number, symbol: Decoration.Shape, color: Decoration.Color) {
@@ -477,21 +482,23 @@ export class Panel {
 			case Panel.Symmetry.FlipNegXY:
 				return new Point(this._height - 1 - y, this._width - 1 - x);
 			case Panel.Symmetry.ParallelH:
-				return new Point(x, y === this._height / 2 ? this._height / 2 : (y + (this._height + 1) / 2) % (this._height + 1));
+				return new Point(x, y === Math.trunc(this._height / 2) ? Math.trunc(this._height / 2) : (y + Math.trunc((this._height + 1) / 2)) % (this._height + 1));
 			case Panel.Symmetry.ParallelV:
-				return new Point(x === this._width / 2 ? this._width / 2 : (x + (this._width + 1) / 2) % (this._width + 1), y);
+				return new Point(x === Math.trunc(this._width / 2) ? Math.trunc(this._width / 2) : (x + Math.trunc((this._width + 1) / 2)) % (this._width + 1), y);
 			case Panel.Symmetry.ParallelHFlip:
 				return new Point(this._width - 1 - x, y === this._height / 2 ? this._height / 2 : (y + (this._height + 1) / 2) % (this._height + 1));
 			case Panel.Symmetry.ParallelVFlip:
 				return new Point(x === this._width / 2 ? this._width / 2 : (x + (this._width + 1) / 2) % (this._width + 1), this._height - 1 - y);
+			case Panel.Symmetry.Pillar:
+				return new Point(x, y);
 			case Panel.Symmetry.PillarParallel:
-				return new Point(x + this._width / 2, y);
+				return new Point(x + Math.trunc(this._width / 2), y);
 			case Panel.Symmetry.PillarHorizontal:
-				return new Point(x + this._width / 2, this._height - 1 - y);
+				return new Point(x + Math.trunc(this._width / 2), this._height - 1 - y);
 			case Panel.Symmetry.PillarVertical:
-				return new Point(this._width / 2 - x, y);
+				return new Point(Math.trunc(this._width / 2) - x, y);
 			case Panel.Symmetry.PillarRotational:
-				return new Point(this._width / 2 - x, this._height - 1 - y);
+				return new Point(Math.trunc(this._width / 2) - x, this._height - 1 - y);
 		}
 		return new Point(x, y);
 	}
@@ -781,9 +788,185 @@ export class Panel {
 
 export namespace Panel {
 	export enum Symmetry { //NOTE - Not all of these are valid symmetries for certain puzzles
-		None, Horizontal, Vertical, Rotational,
-		RotateLeft, RotateRight, FlipXY, FlipNegXY, ParallelH, ParallelV, ParallelHFlip, ParallelVFlip,
-		PillarParallel, PillarHorizontal, PillarVertical, PillarRotational
+		/**
+		 * 无对称：对称点与原始点重合。
+		 * ```
+		 * ● . . .
+		 * . . . .
+		 * . . . .
+		 * ```
+		 */
+		None,
+		/**
+		 * 水平镜像（上下翻转）：以横向中轴为对称轴，y → H-1-y。
+		 * ```
+		 * ● . . .
+		 * . . . .
+		 * ○ . . .
+		 * ```
+		 */
+		Horizontal,
+		/**
+		 * 垂直镜像（左右翻转）：以纵向中轴为对称轴，x → W-1-x。
+		 * ```
+		 * ● . . ○
+		 * . . . .
+		 * . . . .
+		 * ```
+		 */
+		Vertical,
+		/**
+		 * 180° 旋转对称：绕中心点旋转半圈，(x,y) → (W-1-x, H-1-y)。
+		 * ```
+		 * ● . . .
+		 * . . . .
+		 * . . . ○
+		 * ```
+		 */
+		Rotational,
+		/**
+		 * 90° 逆时针旋转对称（仅方形面板自洽），(x,y) → (y, W-1-x)。
+		 * ```
+		 * ● . . ○     (0,0) → (0, W-1)
+		 * . . . .
+		 * . . . .
+		 * ```
+		 */
+		RotateLeft,
+		/**
+		 * 90° 顺时针旋转对称（仅方形面板自洽），(x,y) → (H-1-y, x)。
+		 * ```
+		 * ● . . .     (0,0) → (H-1, 0)
+		 * . . . .
+		 * ○ . . .
+		 * ```
+		 * 注：RotateLeft 与 RotateRight 原点对称点相同，区别在于中间点的映射方向相反。
+		 */
+		RotateRight,
+		/**
+		 * 主对角线翻转（仅方形面板自洽），(x,y) → (y, x)。
+		 * ```
+		 * ● . . .
+		 * . . . .      ● 在对角线上，自身即对称点
+		 * . . . .
+		 * ```
+		 * 取非对角线上的点，如 (1,0)：
+		 * ```
+		 * . ● . .
+		 * ○ . . .
+		 * . . . .
+		 * ```
+		 */
+		FlipXY,
+		/**
+		 * 副对角线翻转（仅方形面板自洽），(x,y) → (H-1-y, W-1-x)。
+		 * ```
+		 * ● . . .     (0,0) → (H-1, W-1)
+		 * . . . .
+		 * . . . ○
+		 * ```
+		 * 取非对角线上的点，如 (1,0)：
+		 * ```
+		 * . ● . .     (1,0) → (H-1, W-2)
+		 * . . . .
+		 * . . ○ .
+		 * ```
+		 */
+		FlipNegXY,
+		/**
+		 * 上下平行路径：面板横向等分为上下两半，路径在两半中平行出现，y 平移 (H+1)/2。
+		 * 中间行（若存在）映射到自身。
+		 * ```
+		 * ● . . .   ← 上半区某点
+		 * - - - -   ← 中线（映射到自身）
+		 * ○ . . .   ← 下半区对应点
+		 * ```
+		 */
+		ParallelH,
+		/**
+		 * 左右平行路径：面板纵向等分为左右两半，路径在两半中平行出现，x 平移 (W+1)/2。
+		 * 中间列（若存在）映射到自身。
+		 * ```
+		 * ● . | ○ .
+		 * . . | . .
+		 * . . | . .
+		 *   ↑中线
+		 * ```
+		 */
+		ParallelV,
+		/**
+		 * 上下平行 + 左右翻转：ParallelH 的 y 平移基础上再对 x 做镜像，
+		 * (x,y) → (W-1-x, (y+(H+1)/2)%(H+1))。
+		 * ```
+		 * ● . . .   ← 上半区某点
+		 * - - - -
+		 * . . . ○   ← 下半区，同时 x 镜像
+		 * ```
+		 */
+		ParallelHFlip,
+		/**
+		 * 左右平行 + 上下翻转：ParallelV 的 x 平移基础上再对 y 做镜像，
+		 * (x,y) → ((x+(W+1)/2)%(W+1), H-1-y)。
+		 * ```
+		 * ● . | . .
+		 * . . | . .
+		 * . . | . ○   ← x 平移 + y 翻转
+		 * ```
+		 */
+		ParallelVFlip,
+		/**
+		 * 无对称：对称点与原始点重合。但是是柱状谜题
+		 * ```
+		 * ● . . .
+		 * . . . .
+		 * . . . .
+		 * ```
+		 */
+		Pillar,
+		/**
+		 * 柱面平行路径：左右两端拓扑相连（卷成圆柱），对称点在 x 方向平移半个宽度并环绕，
+		 * (x,y) → ((x + W/2) % W, y)。
+		 * ```
+		 * 展开视图：
+		 * ● . . ○ . .    ← y 不变，x 平移 W/2 后环绕
+		 * . . . . . .
+		 * . . . . . .
+		 * ```
+		 */
+		PillarParallel,
+		/**
+		 * 柱面水平镜像：柱面环绕 + 上下翻转，
+		 * (x,y) → ((x + W/2) % W, H-1-y)。
+		 * ```
+		 * 展开视图：
+		 * ● . . . . .
+		 * . . . . . .
+		 * . . . ○ . .    ← x 平移 W/2 环绕，同时 y 翻转
+		 * ```
+		 */
+		PillarHorizontal,
+		/**
+		 * 柱面垂直镜像：沿柱面中轴（x = W/2）做镜像并环绕，
+		 * (x,y) → ((W/2 - x + W) % W, y)。
+		 * ```
+		 * 展开视图：
+		 * . . ○ ● . .    ← 关于 x=W/2 对称，y 不变
+		 * . . . . . .
+		 * . . . . . .
+		 * ```
+		 */
+		PillarVertical,
+		/**
+		 * 柱面旋转对称：柱面中轴镜像 + 上下翻转，等价于柱面上的 180° 旋转，
+		 * (x,y) → ((W/2 - x + W) % W, H-1-y)。
+		 * ```
+		 * 展开视图：
+		 * . . . ● . .
+		 * . . . . . .
+		 * . . ○ . . .    ← x 关于 W/2 镜像环绕，同时 y 翻转
+		 * ```
+		 */
+		PillarRotational,
 	}
 
 	export enum ColorMode { Default, Reset, Alternate, WriteColors, Treehouse, TreehouseAlternate };

@@ -1979,8 +1979,5 @@ export enum Config {
     MountainFloorH = 0x80000000
 }
 
-// TODO 添加tetris和cancel符号
-
-
 
 

@@ -230,27 +230,39 @@ export function resizePanel(
 	// 用我们计算好的 newGrid 覆盖 Resize 清空的 grid
 	panel.Grid = newGrid;
 
-	// ---- 重建 startpoints（按 offset 平移，过滤出界） ----
+	// ---- 重建 startpoints（按 offset 平移，成对过滤） ----
 	const newStarts: Point[] = [];
+	const keptStartOldCoords = new Set<string>();
+
 	for (const sp of oldStarts) {
 		const nx = sp.first  + xOff;
 		const ny = sp.second + yOff;
-		if (panelSafe(newW, newH, nx, ny)) {
-			newStarts.push(new Point(nx, ny));
-			console.log(`Startpoint (${sp.first},${sp.second}) -> (${nx},${ny})`);
-		} else {
+
+		if (!panelSafe(newW, newH, nx, ny)) {
 			console.log(`Startpoint (${sp.first},${sp.second}) out of bounds, dropped`);
+			continue;
 		}
-	}
-	// 全部丢失时放默认起点（左上角交点）
-	if (newStarts.length === 0 && oldStarts.length > 0) {
-		console.warn('All startpoints lost, placing default at (0,0)');
-		newStarts.push(new Point(0, 0));
+
+		// 检查其对称点在新坐标系中是否也在界内
+		if (hasSymX || hasSymY) {
+			const symOld = panel.get_sym_point(sp.first, sp.second);
+			const symNx = symOld.first  + xOff;
+			const symNy = symOld.second + yOff;
+			if (!panelSafe(newW, newH, symNx, symNy)) {
+				console.log(`Startpoint (${sp.first},${sp.second}) sym partner out of bounds, both dropped`);
+				continue;
+			}
+		}
+
+		keptStartOldCoords.add(`${sp.first},${sp.second}`);
+		newStarts.push(new Point(nx, ny));
+		console.log(`Startpoint (${sp.first},${sp.second}) -> (${nx},${ny})`);
 	}
 	panel.Startpoints = newStarts;
 
-	// ---- 重建 endpoints（按 offset 平移，重推方向，过滤出界） ----
+	// ---- 重建 endpoints（按 offset 平移，成对过滤） ----
 	const newEnds: Endpoint[] = [];
+
 	for (const ep of oldEnds) {
 		const nx = ep.GetX() + xOff;
 		const ny = ep.GetY() + yOff;
@@ -260,7 +272,17 @@ export function resizePanel(
 			continue;
 		}
 
-		// 重新推断方向（位置变化后原方向可能不再合法）
+		// 检查其对称点在新坐标系中是否也在界内
+		if (hasSymX || hasSymY) {
+			const symOld = panel.get_sym_point(ep.GetX(), ep.GetY());
+			const symNx = symOld.first  + xOff;
+			const symNy = symOld.second + yOff;
+			if (!panelSafe(newW, newH, symNx, symNy)) {
+				console.log(`Endpoint (${ep.GetX()},${ep.GetY()}) sym partner out of bounds, both dropped`);
+				continue;
+			}
+		}
+
 		const newDir = inferDir(nx, ny, newW, newH);
 		const newFlags =
 			IntersectionFlags.ENDPOINT |
@@ -270,19 +292,6 @@ export function resizePanel(
 
 		newEnds.push(new Endpoint(nx, ny, newDir, newFlags));
 		console.log(`Endpoint (${ep.GetX()},${ep.GetY()}) -> (${nx},${ny}) dir=${newDir}`);
-	}
-	// 全部丢失时放默认终点（右下角）
-	if (newEnds.length === 0 && oldEnds.length > 0) {
-		console.warn('All endpoints lost, placing default at bottom-right');
-		const ex = newW - 1, ey = newH - 1;
-		const dir = inferDir(ex, ey, newW, newH);
-		newEnds.push(new Endpoint(
-			ex, ey, dir,
-			IntersectionFlags.ENDPOINT |
-			(dir === Endpoint.Direction.UP || dir === Endpoint.Direction.DOWN
-				? IntersectionFlags.COLUMN
-				: IntersectionFlags.ROW)
-		));
 	}
 	panel.Endpoints = newEnds;
 

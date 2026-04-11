@@ -148,12 +148,20 @@ function phaseLine(decoration: number): LineCell {
 export function phasePuzzle(_panel: Panel) {
     const height = Math.trunc((_panel.Height - 1) / 2);
     const width = Math.trunc((_panel.Width - 1) / 2);
-    const puzzle = new Puzzle(width, height);
+    const sym = _panel.symmetry;
+    const isPillar =
+      sym === Panel.Symmetry.PillarParallel   ||
+      sym === Panel.Symmetry.PillarHorizontal ||
+      sym === Panel.Symmetry.PillarVertical   ||
+      sym === Panel.Symmetry.PillarRotational ||
+      sym === Panel.Symmetry.Pillar;
+
+    const puzzle = new Puzzle(width, height,isPillar);
     const grid = _panel.Grid;
+
     logHexMatrix(grid)
     // console.info(puzzle.grid)
 
-    // 旋转输出?
     for (let row = 0; row < grid.length; row++) {
         for (let col = 0; col < grid[row].length; col++) {
             const decoration = grid[row][col];
@@ -191,6 +199,52 @@ export function phasePuzzle(_panel: Panel) {
         }
 
         puzzle.markEnd(end.GetX(), end.GetY(), dirs);
+    }
+
+    switch (sym) {
+      // ── 非 Pillar ──────────────────────────────────────────
+        case Panel.Symmetry.None:
+            puzzle.symmetry = undefined;
+            break;
+        case Panel.Symmetry.Horizontal:
+        case Panel.Symmetry.ParallelH:
+        case Panel.Symmetry.ParallelHFlip:
+            // 上下反転対称 → y 軸方向に対称
+            puzzle.symmetry = { x: false, y: true };
+            break;
+        case Panel.Symmetry.Vertical:
+        case Panel.Symmetry.ParallelV:
+        case Panel.Symmetry.ParallelVFlip:
+            // 左右反転対称 → x 軸方向に対称
+            puzzle.symmetry = { x: true, y: false };
+            break;
+        case Panel.Symmetry.Rotational:
+        case Panel.Symmetry.RotateLeft:
+        case Panel.Symmetry.RotateRight:
+        case Panel.Symmetry.FlipXY:
+        case Panel.Symmetry.FlipNegXY:
+            // 回転・対角対称 → 両軸に対称
+            puzzle.symmetry = { x: true, y: true };
+            break;
+      // ── Pillar ─────────────────────────────────────────────
+        case Panel.Symmetry.Pillar:
+            puzzle.symmetry = undefined;
+            break;
+        case Panel.Symmetry.PillarParallel:
+            puzzle.symmetry = { x: false, y: false };
+            break;
+        case Panel.Symmetry.PillarHorizontal:
+            puzzle.symmetry = { x: false, y: true };
+            break;
+        case Panel.Symmetry.PillarVertical:
+            puzzle.symmetry = { x: true, y: false };
+            break;
+        case Panel.Symmetry.PillarRotational:
+            puzzle.symmetry = { x: true, y: true };
+            break;
+        default:
+            puzzle.symmetry = undefined;
+            break;
     }
     return puzzle
 }

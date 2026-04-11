@@ -8,7 +8,7 @@ export function draw(puzzle: Puzzle, target = 'puzzle') {
     let pixelWidth: number;
     if (puzzle == null) return
     const svg = document.getElementById(target);
-    console.info('Drawing', puzzle, 'into', svg)
+    console.log('Drawing', puzzle, 'into', svg)
     while (svg.firstChild) svg.removeChild(svg.firstChild)
 
     // Prevent context menu popups within the puzzle

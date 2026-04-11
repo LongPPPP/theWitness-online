@@ -42,20 +42,19 @@ const symbols1 = [
 
 export default function Test() {
     const [refresh, setRefresh] = useState(1)
-    const [showSolution, setShowSolution] = useState('none')
-    const [theme, setTheme] = useState('theme-light')
+    const [showSolution, setShowSolution] = useState(false)
+    const [theme, setTheme] = useState('light')
     const [enableDrag, setEnableDrag] = useState(false)
     const [generatorConfig, setGeneratorConfig] = useState(undefined)
     const [b64c, setB64code] = useState("")
 
     return (
-        <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column'}}>
-
+        <div style={{width: '100%',display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column'}}>
             <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
                 <TheWitnessPuzzle
                     theme={theme}
-                    defaultWidth={4}
-                    defaultHeight={4}
+                    defaultWidth={6}
+                    defaultHeight={6}
                     generatorConfig={generatorConfig}
                     showSolution={showSolution}
                     enableResizeDrag={enableDrag}
@@ -64,17 +63,13 @@ export default function Test() {
                         console.info(b64code)
                     }}
                     PIDBase64={b64c}
+                    symmetry={'PillarVertical'}
                 />
                 <TheWitnessPuzzle
-                    theme={'theme-dark'}
+                    theme={'dark'}
                     PIDBase64={'AQAAAAkJAAAYrwMxFAIDAzsAAAUCAwc7AiMUAgcHOwBgAAIACDsAYAABCAA7OwAAAAE'}
                 />
             </div>
-            <NumberField
-              min={1}
-              max={15}
-              defaultValue={1}
-            />
             <div style={{width: '432px'}}>
                 <button onClick={() => {
                     setRefresh(Math.random())
@@ -82,12 +77,12 @@ export default function Test() {
                 }}>Refresh
                 </button>
                 <button onClick={() => {
-                    setShowSolution(showSolution === 'none' ? 'single' : 'none')
+                    setShowSolution(!showSolution)
                     console.info('toggled')
                 }}>Test Solution
                 </button>
                 <button onClick={() => {
-                    setTheme(theme === 'theme-light' ? 'theme-dark' : 'theme-light')
+                    setTheme(theme === 'light' ? 'dark' : 'light')
                     console.info('toggled')
                 }}>Test Theme
                 </button>
