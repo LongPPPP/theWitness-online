@@ -1,4 +1,5 @@
 import {
+	Alert,
 	alpha,
 	Box,
 	Dialog,
@@ -242,7 +243,7 @@ function LargePuzzleWarningDialog({open, onClose, onConfirm}: LargePuzzleWarning
 					This puzzle is very large and may cause your browser to become unresponsive during the solving process.
 				</Typography>
 				<Typography variant="body2" sx={{color: 'text.secondary'}}>
-					Solving large puzzles (width or height &gt; 13) can take a significant amount of time and computational
+					Solving large puzzles (width or height &gt; 6) can take a significant amount of time and computational
 					resources. Do you want to proceed?
 				</Typography>
 			</DialogContent>
@@ -403,8 +404,8 @@ const createPanel = (width: number, height: number, symmetry: Panel.Symmetry) =>
 }
 
 const isLargeMaze = (panel: Panel) => {
-	const pw = panel ? Math.trunc((panel.Width - 1) / 2) : 0;
-	const ph = panel ? Math.trunc((panel.Height - 1) / 2) : 0;
+	const pw = panel ? panel.Width : 0;
+	const ph = panel ? panel.Height : 0;
 	return pw > 13 || ph > 13
 }
 
@@ -428,6 +429,7 @@ export default function Editor() {
 	const [solutionIndex, setSolutionIndex] = useState<number>(0);
 	const [solutionsCount, setSolutionsCount] = useState<number>(0);
 	const [largePuzzleWarningOpen, setLargePuzzleWarningOpen] = useState<boolean>(false);
+	const [solveError, setSolveError] = useState<string | null>(null);
 
 	const {mode} = useThemeMode();
 
@@ -582,6 +584,7 @@ export default function Editor() {
 		setSolutionIndex(0);
 		setManuallySolve(false);
 		setAutoSolve(true);
+		setSolveError(null); // 每次重新求解时清空上次错误
 	}, []);
 
 	const handleAutoSolve = () => {
@@ -589,6 +592,7 @@ export default function Editor() {
 			// 当前已在显示解 → 关闭
 			setManuallySolve(false);
 			setAutoSolve(false);
+			setSolveError(null); // 关闭时也清空错误
 			return;
 		}
 
@@ -689,6 +693,18 @@ export default function Editor() {
 		setSolutionsCount(count);
 		// 如果当前索引越界，重置为 0
 		setSolutionIndex(curr => curr >= count ? 0 : curr);
+	}, [])
+
+	const handleSolveProgress = useCallback((p: number) => {
+		setSolveProgress(p);
+		setIsSolving(p !== null)
+	}, [])
+
+	const handleSolveError = useCallback((message: string) => {
+		setIsSolving(false);
+		setSolveProgress(null);
+		setAutoSolve(false);
+		setSolveError(message);
 	}, [])
 
 	const handleSave = () => {
@@ -901,10 +917,8 @@ export default function Editor() {
 							showSolution={autoSolve}
 							solutionIndex={solutionIndex}
 							onSolutionsFound={handleSolutionFound}
-							onSolveProgress={(p) => {
-								setSolveProgress(p);
-								setIsSolving(p !== null)
-							}}
+							onSolveProgress={handleSolveProgress}
+							onSolveError={handleSolveError}
 						/>
 					</div>
 					<CustomToggleButtonGroup
@@ -976,39 +990,51 @@ export default function Editor() {
 					onConfirm={doStartAutoSolve}
 				/>
 				{/*底部功能栏*/}
-				<Stack direction="row" alignItems="center" spacing={2}>
-					<FormControlLabel control={<Checkbox checked={manuallySolve} onChange={handleManuallySolve}/>}
-														label="Solve Maunally"/>
-					<TextButton size="large" color="success" sx={{fontWeight: 'bolder'}} onClick={handleAutoSolve}
-											disabled={isSolving}>
-						{autoSolve ? "Hide Solutions" : "Solve Automatically"}
-					</TextButton>
-					{/* --- 求解进度条(大迷宫的时候才显示) --- */}
-					{isLargeMaze(panel.current) && isSolving && solveProgress !== null && (
-						<Box sx={{minWidth: 200, display: 'flex', alignItems: 'center', gap: 1}}>
-							<LinearProgress
-								variant="determinate"
-								value={solveProgress * 100}
-								sx={{flexGrow: 1, height: 8, borderRadius: 1}}
-							/>
-							<Typography variant="body2" color="text.secondary" sx={{minWidth: 45}}>
-								{`${Math.round(solveProgress * 100)}%`}
-							</Typography>
-						</Box>
-					)}
-					{/* --- 解法切换控件 --- */}
-					{!isSolving && autoSolve && solutionsCount > 0 && (
-						<Stack direction="row" alignItems="center" sx={{ml: 2, bgcolor: 'action.hover', borderRadius: 2, px: 1}}>
-							<IconButton size="small" onClick={handlePrevSolution}>
-								<NavigateBeforeIcon fontSize="small"/>
-							</IconButton>
-							<Typography variant="body2" sx={{mx: 1, minWidth: '80px', textAlign: 'center', fontWeight: 'bold'}}>
-								{solutionsCount > 0 ? `${solutionIndex + 1} / ${solutionsCount}` : "No Solution"}
-							</Typography>
-							<IconButton size="small" onClick={handleNextSolution}>
-								<NavigateNextIcon fontSize="small"/>
-							</IconButton>
-						</Stack>
+				<Stack direction="column" alignItems="center" sx={{position: "relative", width:'100%'}}>
+					<Stack direction="row" alignItems="center" spacing={2}>
+						<FormControlLabel control={<Checkbox checked={manuallySolve} onChange={handleManuallySolve}/>}
+															label="Solve Maunally"/>
+						<TextButton size="large" color="success" sx={{fontWeight: 'bolder'}} onClick={handleAutoSolve}
+												disabled={isSolving}>
+							{autoSolve ? "Hide Solutions" : "Solve Automatically"}
+						</TextButton>
+						{/* --- 求解进度条(大迷宫的时候才显示) --- */}
+						{isLargeMaze(panel.current) && isSolving && solveProgress !== null && (
+							<Box sx={{minWidth: 200, display: 'flex', alignItems: 'center', gap: 1}}>
+								<LinearProgress
+									variant="determinate"
+									value={solveProgress * 100}
+									sx={{flexGrow: 1, height: 8, borderRadius: 1}}
+								/>
+								<Typography variant="body2" color="text.secondary" sx={{minWidth: 45}}>
+									{`${Math.round(solveProgress * 100)}%`}
+								</Typography>
+							</Box>
+						)}
+						{/* --- 解法切换控件 --- */}
+						{!isSolving && autoSolve && solutionsCount > 0 && (
+							<Stack direction="row" alignItems="center" sx={{ml: 2, bgcolor: 'action.hover', borderRadius: 2, px: 1}}>
+								<IconButton size="small" onClick={handlePrevSolution}>
+									<NavigateBeforeIcon fontSize="small"/>
+								</IconButton>
+								<Typography variant="body2" sx={{mx: 1, minWidth: '80px', textAlign: 'center', fontWeight: 'bold'}}>
+									{solutionsCount > 0 ? `${solutionIndex + 1} / ${solutionsCount >= 10000 ? '10000+' : solutionsCount}` : "No Solution"}
+								</Typography>
+								<IconButton size="small" onClick={handleNextSolution}>
+									<NavigateNextIcon fontSize="small"/>
+								</IconButton>
+							</Stack>
+						)}
+					</Stack>
+					{/* --- 错误原因展示(单独一行) --- */}
+					{solveError != null && (
+						<Alert
+							severity="error"
+							onClose={() => setSolveError(null)}
+							sx={{py: 0, alignItems: 'center', position: "absolute", bottom: "-42px",}}
+						>
+							{solveError}
+						</Alert>
 					)}
 				</Stack>
 			</Stack>

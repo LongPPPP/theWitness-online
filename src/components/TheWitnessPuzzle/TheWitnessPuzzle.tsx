@@ -96,6 +96,7 @@ interface PuzzleProps {
 	solutionIndex?: number; // 外部传入显示第几个
 	onSolutionsFound?: (count: number) => void; // 求解后的回调
 	onSolveProgress?: (progress: number | null) => void; // 求解进度回调：null=未求解，0~100=进度百分比
+	onSolveError?: (message: string) => void; // 求解前校验失败或运行时异常的回调
 	symmetry?: PuzzleStyle; // TODO：作用性存疑，在Editor种是使用code来设置迷宫的,不过在generator中倒是可以使用
 }
 
@@ -160,6 +161,7 @@ const TheWitnessPuzzle = (
 		solutionIndex,
 		onSolutionsFound,
 		onSolveProgress,
+		onSolveError,
 		symmetry = 'None',
 	}: PuzzleProps
 ) => {
@@ -340,20 +342,29 @@ const TheWitnessPuzzle = (
 
 		const solver = new PuzzleSolver(puzzle);
 		solverRef.current = solver;
-		solver.solve(
-			(progress) => {
-				onSolveProgress?.(progress);
-			},
-			(paths) => {
-				// 同步或异步完成后均走此分支
-				if (cachedSolutions.current?.puzzle === puzzle) {
-					cachedSolutions.current = {puzzle, solutions: paths};
+		try {
+			solver.solve(
+				(progress) => {
+					onSolveProgress?.(progress);
+				},
+				(paths) => {
+					// 同步或异步完成后均走此分支
+					if (cachedSolutions.current?.puzzle === puzzle) {
+						cachedSolutions.current = {puzzle, solutions: paths};
+					}
+					solverRef.current = null;
+					onSolveProgress?.(null);
+					setSolveTick(t => t + 1); // 触发重渲染，进入情况 B
 				}
-				solverRef.current = null;
-				onSolveProgress?.(null);
-				setSolveTick(t => t + 1); // 触发重渲染，进入情况 B
-			}
-		);
+			);
+		} catch (e) {
+			solverRef.current = null;
+			cachedSolutions.current = null;
+			onSolveProgress?.(null);
+			const message = e instanceof Error ? e.message : String(e);
+			console.error('[PuzzleSolver]', message);
+			onSolveError?.(message);
+		}
 
 		return () => {
 			// effect 因依赖变化而重跑前，若求解仍在进行则取消
