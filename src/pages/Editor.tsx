@@ -32,7 +32,7 @@ import SymbolSVG, {type SVGParams} from "@/components/TheWitnessPuzzle/SymbolSVG
 import {ROTATION_BIT} from "@/components/TheWitnessPuzzle/engine/puzzle/polyominos.ts";
 import React, {useCallback, useEffect, useRef, useState} from "react";
 import {createElement} from "@/components/TheWitnessPuzzle/engine/puzzle/svg.ts";
-import {Decoration, IntersectionFlags, Panel} from "@/components/TheWitnessPuzzle/engine/generator/Panel.ts";
+import {Decoration, IntersectionFlags, Panel, Point} from "@/components/TheWitnessPuzzle/engine/generator/Panel.ts";
 import {phaseColor, phasePolyShape} from "@/components/TheWitnessPuzzle/engine/phase.ts";
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
@@ -369,12 +369,7 @@ const getColorName = (color: number): string => {
 const createPanel = (width: number, height: number, symmetry: Panel.Symmetry) => {
 	let [startX, startY] = [0, 0];
 	let [endX, endY] = [0, height * 2];
-	const isPillar =
-		symmetry === Panel.Symmetry.PillarParallel ||
-		symmetry === Panel.Symmetry.PillarHorizontal ||
-		symmetry === Panel.Symmetry.PillarVertical ||
-		symmetry === Panel.Symmetry.PillarRotational ||
-		symmetry === Panel.Symmetry.Pillar;
+	const isPillar = Panel.isPillar(symmetry)
 
 	if (isPillar && width % 2 === 1) {
 		throw new Error('若symmetry含有Pillar，则必须保证width为偶数')
@@ -448,24 +443,26 @@ export default function Editor() {
 		} else if (_symbol.current.type === 'start') {
 			if (x % 2 === 1 && y % 2 === 1) return
 
+			let symPoint: Point = null
+			const sym = panel.current.symmetry
+			if (Panel.isSymmetry(sym)) symPoint = panel.current.get_sym_point(x, y)
+			console.error(symPoint)
+
 			if (panel.current.Startpoints.some(point => point.first === x && point.second === y)) {
 				panel.current.ClearGridSymbol(x, y)
+
+				if (symPoint) {
+					panel.current.ClearGridSymbol(symPoint.first, symPoint.second)
+				}
 			} else {
 				panel.current.SetGridSymbol(x, y, Decoration.Shape.Start, Decoration.Color.None);
-			}
 
-			// TODO: symmetry
-			// if (puzzle.symmetry != null) {
-			// 	var sym = puzzle.getSymmetricalPos(x, y)
-			// 	if (sym.x === x && sym.y === y) {
-			// 		// If the two startpoints would be in the same location, do nothing.
-			// 		puzzle.grid[x][y].start = null
-			// 	} else {
-			// 		puzzle.updateCell2(sym.x, sym.y, 'start', puzzle.grid[x][y].start)
-			// 	}
-			// }
+				if (symPoint && !(symPoint.first === x && symPoint.second === y)) {
+					panel.current.SetGridSymbol(symPoint.first, symPoint.second, Decoration.Shape.Start, Decoration.Color.None);
+				}
+			}
 		} else if (_symbol.current.type == 'end') {
-			if (x % 2 === 1 && y % 2 === 1) return
+			if (x % 2 === 1 && y % 2 === 1) return //TODO:end可以放在里面吗？
 
 			if (panel.current.Endpoints.some(point => point.GetX() === x && point.GetY() === y)) {
 				panel.current.ClearGridSymbol(x, y)
@@ -557,6 +554,28 @@ export default function Editor() {
 		}
 		setCode(panel.current.serialize())
 	}, [])
+
+	const handleSymmetryChange = (e: React.ChangeEvent<Omit<HTMLInputElement, "value"> & { value: string }>) => {
+		const v = e.target.value
+		setSymmetry(v)
+
+		let w = Math.trunc((panel.current.Width - 1) / 2);
+		const h = Math.trunc((panel.current.Height - 1) / 2);
+		const sym = Panel.Symmetry[v as keyof typeof Panel.Symmetry];
+		const isPillarSym =
+			sym === Panel.Symmetry.PillarParallel ||
+			sym === Panel.Symmetry.PillarHorizontal ||
+			sym === Panel.Symmetry.PillarVertical ||
+			sym === Panel.Symmetry.PillarRotational;
+		if (isPillarSym && w % 2 === 1) {
+			w += 1;
+		}
+		if (isPillarSym && w <= 4) {
+			w = 6;
+		}
+		const newPanel = createPanel(w, h, sym);
+		setCode(newPanel.serialize());
+	}
 
 	const handleSymbolChange = (_event: React.MouseEvent<HTMLElement>, newSymbol: Symbol) => {
 		if (newSymbol !== null) {
@@ -794,31 +813,13 @@ export default function Editor() {
 		_symbol.current = symbol;
 	}, [color, symbol]);
 
-	useEffect(() => {
-		let w = Math.trunc((panel.current.Width - 1) / 2);
-		const h = Math.trunc((panel.current.Height - 1) / 2);
-		const sym = Panel.Symmetry[symmetry as keyof typeof Panel.Symmetry];
-		const isPillarSym =
-			sym === Panel.Symmetry.PillarParallel ||
-			sym === Panel.Symmetry.PillarHorizontal ||
-			sym === Panel.Symmetry.PillarVertical ||
-			sym === Panel.Symmetry.PillarRotational;
-		if (isPillarSym && w % 2 === 1) {
-			w += 1;
-		}
-		if (isPillarSym && w <= 4) {
-			w = 6;
-		}
-		const newPanel = createPanel(w, h, sym);
-		setCode(newPanel.serialize());
-	}, [symmetry])
-
 	return (
 		<Paper sx={{width: '100%'}}>
 			<Stack sx={{height: '100%'}} alignItems="center" justifyContent="center">
 				{/*顶部功能栏*/}
 				<Stack direction="row" spacing={2} alignItems="center"
-							 sx={{pb: 2, borderColor: 'divider', px: 2}}>{/* 1. 重命名区域 */}
+							 sx={{pb: 2, borderColor: 'divider', px: 2}}>
+					{/* 1. 重命名区域 */}
 					<TextField
 						variant="standard"
 						label="Puzzle Name"
@@ -833,7 +834,7 @@ export default function Editor() {
 						<Select
 							value={symmetry}
 							label="Puzzle Style"
-							onChange={(e) => setSymmetry(e.target.value)}
+							onChange={handleSymmetryChange}
 						>
 							{styleOptions.map((option) => (
 								<MenuItem key={option.value} value={option.value}>
@@ -990,7 +991,7 @@ export default function Editor() {
 					onConfirm={doStartAutoSolve}
 				/>
 				{/*底部功能栏*/}
-				<Stack direction="column" alignItems="center" sx={{position: "relative", width:'100%'}}>
+				<Stack direction="column" alignItems="center" sx={{position: "relative", width: '100%'}}>
 					<Stack direction="row" alignItems="center" spacing={2}>
 						<FormControlLabel control={<Checkbox checked={manuallySolve} onChange={handleManuallySolve}/>}
 															label="Solve Maunally"/>
@@ -1012,7 +1013,7 @@ export default function Editor() {
 							</Box>
 						)}
 						{/* --- 解法切换控件 --- */}
-						{!isSolving && autoSolve && solutionsCount > 0 && (
+						{!isSolving && autoSolve && (
 							<Stack direction="row" alignItems="center" sx={{ml: 2, bgcolor: 'action.hover', borderRadius: 2, px: 1}}>
 								<IconButton size="small" onClick={handlePrevSolution}>
 									<NavigateBeforeIcon fontSize="small"/>
