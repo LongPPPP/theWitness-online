@@ -112,12 +112,7 @@ type DragPosition = {
 function createPanel(width: number, height: number, symmetry: Panel.Symmetry) {
 	let [startX, startY] = [0, 0];
 	let [endX, endY] = [0, height * 2];
-	const isPillar =
-		symmetry === Panel.Symmetry.PillarParallel ||
-		symmetry === Panel.Symmetry.PillarHorizontal ||
-		symmetry === Panel.Symmetry.PillarVertical ||
-		symmetry === Panel.Symmetry.PillarRotational ||
-		symmetry === Panel.Symmetry.Pillar;
+	const isPillar = Panel.isPillar(symmetry)
 
 	if (isPillar && width % 2 === 1) {
 		throw new Error('若symmetry含有Pillar，则必须保证width为偶数')
@@ -224,10 +219,12 @@ const TheWitnessPuzzle = (
 	// generate random puzzle
 	useEffect(() => {
 		if (!generatorConfig || !width.current || !height.current) return;
+
 		const symbols = generatorConfig.symbols;
 		if (symbols.length > 18) {
 			console.error("the num of symbols cannot more than 9")
 		}
+
 		if (generatorWorker.current != undefined) {
 			generatorWorker.current.postMessage({
 				type: 'setGridSize',
@@ -255,7 +252,8 @@ const TheWitnessPuzzle = (
 				}
 			}
 		} else {
-			panel.current = new Panel(0x018AF, width.current, height.current, 0, 0, 0, 0)
+			if (!width.current || !height.current || !generator.current) return;
+
 			puzzleRef.current.innerHTML = " "
 			generator.current.setGridSize(width.current, height.current);
 			generator.current.generate(
@@ -371,7 +369,7 @@ const TheWitnessPuzzle = (
 			solverRef.current?.cancelSolving();
 			solverRef.current = null;
 		};
-	}, [puzzle, showSolution, solutionIndex, onSolutionsFound, solveTick, onSolveProgress]);
+	}, [puzzle, showSolution, solutionIndex, onSolutionsFound, solveTick, onSolveProgress, onSolveError]);
 
 	// 当config变化的时候设置puzzle的config
 	useEffect(() => {
