@@ -221,71 +221,91 @@ export function resizePanel(
 	console.log('Panel resize grid actions (each row, top→bottom):');
 	dbg.forEach((row, i) => console.log(`y=${i}: ${row}`));
 
-	// ---- 更新 Panel 内部状态 ----
-	// 清空 startpoints/endpoints，避免 Panel.Resize() 里的旧逻辑干扰
-	panel.Startpoints = [];
-	panel.Endpoints   = [];
-	// Panel.Resize 更新内部 _width/_height，并将 _grid 清空
-	panel.Resize(newW, newH);
-	// 用我们计算好的 newGrid 覆盖 Resize 清空的 grid
-	panel.Grid = newGrid;
-
 	// ---- 重建 startpoints（按 offset 平移，成对过滤） ----
+	//
+	// 策略：在旧坐标系下调用 get_sym_point（panel 尺寸未变），
+	// 判断自身及对称伙伴在新界内是否都合法。
+	// 任意一个失效则两者都丢弃，用 droppedStartKeys 防止伙伴被重复加入。
 	const newStarts: Point[] = [];
-	const keptStartOldCoords = new Set<string>();
+	const droppedStartKeys = new Set<string>();
 
 	for (const sp of oldStarts) {
+		const key = `${sp.first},${sp.second}`;
+		if (droppedStartKeys.has(key)) continue;
+
 		const nx = sp.first  + xOff;
 		const ny = sp.second + yOff;
 
+		// 自身越界 → 标记对称伙伴也丢弃，然后跳过
 		if (!panelSafe(newW, newH, nx, ny)) {
 			console.log(`Startpoint (${sp.first},${sp.second}) out of bounds, dropped`);
+			if (hasSymX || hasSymY) {
+				const symOld = panel.get_sym_point(sp.first, sp.second);
+				droppedStartKeys.add(`${symOld.first},${symOld.second}`);
+				console.log(`Startpoint sym partner (${symOld.first},${symOld.second}) also dropped`);
+			}
 			continue;
 		}
 
-		// 检查其对称点在新坐标系中是否也在界内
+		// 有对称时：对称伙伴也必须在新界内，否则两者都丢弃
 		if (hasSymX || hasSymY) {
 			const symOld = panel.get_sym_point(sp.first, sp.second);
 			const symNx = symOld.first  + xOff;
 			const symNy = symOld.second + yOff;
 			if (!panelSafe(newW, newH, symNx, symNy)) {
-				console.log(`Startpoint (${sp.first},${sp.second}) sym partner out of bounds, both dropped`);
+				console.log(`Startpoint (${sp.first},${sp.second}) sym partner (${symOld.first},${symOld.second}) out of bounds, both dropped`);
+				droppedStartKeys.add(`${symOld.first},${symOld.second}`);
 				continue;
 			}
 		}
 
-		keptStartOldCoords.add(`${sp.first},${sp.second}`);
 		newStarts.push(new Point(nx, ny));
 		console.log(`Startpoint (${sp.first},${sp.second}) -> (${nx},${ny})`);
 	}
-	panel.Startpoints = newStarts;
 
 	// ---- 重建 endpoints（按 offset 平移，成对过滤） ----
 	const newEnds: Endpoint[] = [];
+	const droppedEndKeys = new Set<string>();
 
 	for (const ep of oldEnds) {
+		const key = `${ep.GetX()},${ep.GetY()}`;
+		if (droppedEndKeys.has(key)) continue;
+
 		const nx = ep.GetX() + xOff;
 		const ny = ep.GetY() + yOff;
 
+		// 自身越界 → 标记对称伙伴也丢弃
 		if (!panelSafe(newW, newH, nx, ny)) {
 			console.log(`Endpoint (${ep.GetX()},${ep.GetY()}) out of bounds, dropped`);
+			if (hasSymX || hasSymY) {
+				const symOld = panel.get_sym_point(ep.GetX(), ep.GetY());
+				droppedEndKeys.add(`${symOld.first},${symOld.second}`);
+				console.log(`Endpoint sym partner (${symOld.first},${symOld.second}) also dropped`);
+			}
 			continue;
 		}
 
+		// 终点必须在新边界上
 		const isOnNewBoundary = (nx === 0 || nx === newW - 1 || ny === 0 || ny === newH - 1);
-
 		if (!isOnNewBoundary) {
 			console.log(`Endpoint (${nx},${ny}) is no longer on boundary after resize, dropped`);
+			if (hasSymX || hasSymY) {
+				const symOld = panel.get_sym_point(ep.GetX(), ep.GetY());
+				droppedEndKeys.add(`${symOld.first},${symOld.second}`);
+				console.log(`Endpoint sym partner (${symOld.first},${symOld.second}) also dropped`);
+			}
 			continue;
 		}
 
-		// 检查其对称点在新坐标系中是否也在界内
+		// 有对称时：对称伙伴必须也在新界内且在边界上
 		if (hasSymX || hasSymY) {
 			const symOld = panel.get_sym_point(ep.GetX(), ep.GetY());
 			const symNx = symOld.first  + xOff;
 			const symNy = symOld.second + yOff;
-			if (!panelSafe(newW, newH, symNx, symNy)) {
-				console.log(`Endpoint (${ep.GetX()},${ep.GetY()}) sym partner out of bounds, both dropped`);
+			const symOnBoundary = (symNx === 0 || symNx === newW - 1 || symNy === 0 || symNy === newH - 1);
+			if (!panelSafe(newW, newH, symNx, symNy) || !symOnBoundary) {
+				console.log(`Endpoint (${ep.GetX()},${ep.GetY()}) sym partner (${symOld.first},${symOld.second}) invalid, both dropped`);
+				droppedEndKeys.add(`${symOld.first},${symOld.second}`);
 				continue;
 			}
 		}
@@ -300,7 +320,19 @@ export function resizePanel(
 		newEnds.push(new Endpoint(nx, ny, newDir, newFlags));
 		console.log(`Endpoint (${ep.GetX()},${ep.GetY()}) -> (${nx},${ny}) dir=${newDir}`);
 	}
-	panel.Endpoints = newEnds;
+
+	// ---- 更新 Panel 内部状态 ----
+	// 先清空再 Resize，避免 Panel.Resize() 里的旧逻辑干扰已计算好的列表
+	panel.Startpoints = [];
+	panel.Endpoints   = [];
+	// Panel.Resize 更新内部 _width/_height，并将 _grid 清空
+	panel.Resize(newW, newH);
+	// 用我们计算好的 newGrid 覆盖 Resize 清空的 grid
+	panel.Grid = newGrid;
+
+	// 写入过滤后的 startpoints / endpoints
+	panel.Startpoints = newStarts;
+	panel.Endpoints   = newEnds;
 
 	return true;
 }
