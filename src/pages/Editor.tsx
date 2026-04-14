@@ -446,7 +446,6 @@ export default function Editor() {
 			let symPoint: Point = null
 			const sym = panel.current.symmetry
 			if (Panel.isSymmetry(sym)) symPoint = panel.current.get_sym_point(x, y)
-			console.error(symPoint)
 
 			if (panel.current.Startpoints.some(point => point.first === x && point.second === y)) {
 				panel.current.ClearGridSymbol(x, y)
@@ -462,19 +461,26 @@ export default function Editor() {
 				}
 			}
 		} else if (_symbol.current.type == 'end') {
-			if (x % 2 === 1 && y % 2 === 1) return //TODO:end可以放在里面吗？
+			if (x % 2 === 1 && y % 2 === 1) return
+			if ((x !== 0 && x !== panel.current.Width - 1) && (y !== 0 && y !== panel.current.Height - 1)) return // end只能放在边界上
+
+			let symPoint: Point = null
+			const sym = panel.current.symmetry
+			if (Panel.isSymmetry(sym)) symPoint = panel.current.get_sym_point(x, y)
 
 			if (panel.current.Endpoints.some(point => point.GetX() === x && point.GetY() === y)) {
 				panel.current.ClearGridSymbol(x, y)
+
+				if (symPoint) {
+					panel.current.ClearGridSymbol(symPoint.first, symPoint.second)
+				}
 			} else {
 				panel.current.SetGridSymbol(x, y, Decoration.Shape.Exit, Decoration.Color.None);
-			}
 
-			// TODO: symmetry
-			//
-			//
-			//
-			//
+				if (symPoint && !(symPoint.first === x && symPoint.second === y)) {
+					panel.current.SetGridSymbol(symPoint.first, symPoint.second, Decoration.Shape.Exit, Decoration.Color.None);
+				}
+			}
 		} else if (_symbol.current.type == 'dot') {
 			if (x % 2 === 1 && y % 2 === 1) return
 
