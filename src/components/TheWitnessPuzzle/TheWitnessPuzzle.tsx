@@ -360,7 +360,7 @@ const TheWitnessPuzzle = (
 			solverRef.current?.cancelSolving();
 			solverRef.current = null;
 		};
-	}, [puzzle, showSolution, solutionIndex, onSolutionsFound, solveTick]);
+	}, [puzzle, showSolution, solutionIndex, onSolutionsFound, solveTick, onSolveProgress]);
 
 	// 当config变化的时候设置puzzle的config
 	useEffect(() => {
