@@ -437,6 +437,7 @@ const TheWitnessPuzzle = (
 			while (Math.abs(dx) >= xLim) {
 				const drag = (elemId.includes('right') ? 'right' : 'left');
 				if (!resizePanel(xScale * Math.sign(dx), 0, drag, panel.current)) break;
+				generatorSolution.current = null; // 若有保存随机器的解，清空，不然会报错
 				setPuzzle(phasePuzzle(panel.current))
 				width.current += xScale * Math.sign(dx) / 2; // 需要除以二（原本算上道路了）
 				dx -= Math.sign(dx) * xLim;
@@ -446,6 +447,7 @@ const TheWitnessPuzzle = (
 			while (Math.abs(dy) >= yLim) {
 				const drag = (elemId.includes('top') ? 'top' : 'bottom');
 				if (!resizePanel(0, yScale * Math.sign(dy), drag, panel.current)) break;
+				generatorSolution.current = null; // 若有保存随机器的解，清空，不然会报错
 				setPuzzle(phasePuzzle(panel.current))
 				height.current += yScale * Math.sign(dy) / 2;  // 需要除以二（原本算上道路了）
 				dy -= Math.sign(dy) * yLim;
