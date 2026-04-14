@@ -263,7 +263,7 @@ export class Panel {
 	private _grid: number[][];
 	private _startpoints: Point[];
 	private _endpoints: Endpoint[];
-	private _style: number;
+	private _style: Panel.Styles;
 	private readonly id: number;
 
 	// private minx: number;
@@ -783,6 +783,20 @@ export class Panel {
 
 		panel.Style = (buffer[offset++] << 24) | (buffer[offset++] << 16) | (buffer[offset++] << 8) | buffer[offset++];
 		return panel;
+	}
+
+	public static isSymmetry(sym: Panel.Symmetry) {
+			return (sym !== Panel.Symmetry.None && sym !== Panel.Symmetry.Pillar);
+	}
+
+	public static isPillar(sym: Panel.Symmetry) {
+		return (
+			sym === Panel.Symmetry.PillarParallel ||
+			sym === Panel.Symmetry.PillarHorizontal ||
+			sym === Panel.Symmetry.PillarVertical ||
+			sym === Panel.Symmetry.PillarRotational ||
+			sym === Panel.Symmetry.Pillar
+		)
 	}
 }
 
