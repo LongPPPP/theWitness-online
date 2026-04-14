@@ -9,6 +9,7 @@ import {
 	FormControl,
 	IconButton,
 	InputLabel,
+	LinearProgress,
 	List,
 	ListItem,
 	ListItemButton,
@@ -217,6 +218,44 @@ function ImportCodeDialog({open, onClose, onConfirm}: ImportCodeDialogProps) {
 	);
 }
 
+// =================================== Components-LargePuzzleWarningDialog ===================================
+
+interface LargePuzzleWarningDialogProps {
+	open: boolean;
+	onClose: () => void;
+	onConfirm: () => void;
+}
+
+function LargePuzzleWarningDialog({open, onClose, onConfirm}: LargePuzzleWarningDialogProps) {
+	const handleConfirm = () => {
+		onConfirm();
+		onClose();
+	};
+
+	return (
+		<Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+			<DialogTitle fontWeight="bold" sx={{color: 'warning.main'}}>
+				⚠️ Large Puzzle Warning
+			</DialogTitle>
+			<DialogContent dividers>
+				<Typography variant="body1" sx={{mb: 2}}>
+					This puzzle is very large and may cause your browser to become unresponsive during the solving process.
+				</Typography>
+				<Typography variant="body2" sx={{color: 'text.secondary'}}>
+					Solving large puzzles (width or height &gt; 13) can take a significant amount of time and computational
+					resources. Do you want to proceed?
+				</Typography>
+			</DialogContent>
+			<DialogActions sx={{px: 3, py: 2}}>
+				<TextButton onClick={onClose} color="inherit">Cancel</TextButton>
+				<TextButton onClick={handleConfirm} variant="contained" color="warning">
+					Proceed Anyway
+				</TextButton>
+			</DialogActions>
+		</Dialog>
+	);
+}
+
 // =================================== Editor ===================================
 
 type Symbol = SVGParams & { value: number }
@@ -330,9 +369,9 @@ const createPanel = (width: number, height: number, symmetry: Panel.Symmetry) =>
 	let [startX, startY] = [0, 0];
 	let [endX, endY] = [0, height * 2];
 	const isPillar =
-		symmetry === Panel.Symmetry.PillarParallel   ||
+		symmetry === Panel.Symmetry.PillarParallel ||
 		symmetry === Panel.Symmetry.PillarHorizontal ||
-		symmetry === Panel.Symmetry.PillarVertical   ||
+		symmetry === Panel.Symmetry.PillarVertical ||
 		symmetry === Panel.Symmetry.PillarRotational ||
 		symmetry === Panel.Symmetry.Pillar;
 
@@ -345,7 +384,7 @@ const createPanel = (width: number, height: number, symmetry: Panel.Symmetry) =>
 	} else if (isPillar) {
 		[startX, startY] = [width - 2, 0];
 		// 在旋转对称的时候使起点和终点错开放置
-		if(symmetry === Panel.Symmetry.PillarRotational) {
+		if (symmetry === Panel.Symmetry.PillarRotational) {
 			[endX, endY] = [width + 2, height * 2];
 		} else {
 			[endX, endY] = [width - 2, height * 2];
@@ -361,6 +400,12 @@ const createPanel = (width: number, height: number, symmetry: Panel.Symmetry) =>
 		}
 	}
 	return panel;
+}
+
+const isLargeMaze = (panel: Panel) => {
+	const pw = panel ? Math.trunc((panel.Width - 1) / 2) : 0;
+	const ph = panel ? Math.trunc((panel.Height - 1) / 2) : 0;
+	return pw > 13 || ph > 13
 }
 
 export default function Editor() {
@@ -379,8 +424,10 @@ export default function Editor() {
 	const [manuallySolve, setManuallySolve] = useState<boolean>(false);
 	const [autoSolve, setAutoSolve] = useState<boolean>(false);
 	const [isSolving, setIsSolving] = useState<boolean>(false);
+	const [solveProgress, setSolveProgress] = useState<number | null>(null);
 	const [solutionIndex, setSolutionIndex] = useState<number>(0);
 	const [solutionsCount, setSolutionsCount] = useState<number>(0);
+	const [largePuzzleWarningOpen, setLargePuzzleWarningOpen] = useState<boolean>(false);
 
 	const {mode} = useThemeMode();
 
@@ -529,13 +576,27 @@ export default function Editor() {
 		}
 	}
 
-	const handleAutoSolve = () => {
-		if (autoSolve === false) {
-			setIsSolving(true);
-			setSolutionIndex(0); // 开启时重置索引
-		}
+	const doStartAutoSolve = useCallback(() => {
+		setIsSolving(true);
+		setSolveProgress(0);
+		setSolutionIndex(0);
 		setManuallySolve(false);
-		setAutoSolve(prv => !prv);
+		setAutoSolve(true);
+	}, []);
+
+	const handleAutoSolve = () => {
+		if (autoSolve) {
+			// 当前已在显示解 → 关闭
+			setManuallySolve(false);
+			setAutoSolve(false);
+			return;
+		}
+
+		if (isLargeMaze(panel.current)) {
+			setLargePuzzleWarningOpen(true);
+		} else {
+			doStartAutoSolve();
+		}
 	};
 
 	const handlePrevSolution = () => {
@@ -623,7 +684,8 @@ export default function Editor() {
 	}, [manuallySolve, autoSolve, onElementClicked]);
 
 	const handleSolutionFound = useCallback((count: number) => {
-		setIsSolving(false)
+		setIsSolving(false);
+		setSolveProgress(null);
 		setSolutionsCount(count);
 		// 如果当前索引越界，重置为 0
 		setSolutionIndex(curr => curr >= count ? 0 : curr);
@@ -646,7 +708,7 @@ export default function Editor() {
 	const handleDelete = () => {
 		setPuzzleName("New Puzzle")
 		setManuallySolve(false)
-		setSymmetry("default")
+		setSymmetry("None")
 		setCode("AQAAAAkJAAAYrwBgAAIIADsAYAABAAg7OwAAAAE=")
 		panel.current = Panel.deserialize("AQAAAAkJAAAYrwBgAAIIADsAYAABAAg7OwAAAAE=");
 	};
@@ -721,12 +783,15 @@ export default function Editor() {
 		const h = Math.trunc((panel.current.Height - 1) / 2);
 		const sym = Panel.Symmetry[symmetry as keyof typeof Panel.Symmetry];
 		const isPillarSym =
-			sym === Panel.Symmetry.PillarParallel   ||
+			sym === Panel.Symmetry.PillarParallel ||
 			sym === Panel.Symmetry.PillarHorizontal ||
-			sym === Panel.Symmetry.PillarVertical   ||
+			sym === Panel.Symmetry.PillarVertical ||
 			sym === Panel.Symmetry.PillarRotational;
-		if(isPillarSym && w % 2 === 1) {
+		if (isPillarSym && w % 2 === 1) {
 			w += 1;
+		}
+		if (isPillarSym && w <= 4) {
+			w = 6;
 		}
 		const newPanel = createPanel(w, h, sym);
 		setCode(newPanel.serialize());
@@ -836,6 +901,10 @@ export default function Editor() {
 							showSolution={autoSolve}
 							solutionIndex={solutionIndex}
 							onSolutionsFound={handleSolutionFound}
+							onSolveProgress={(p) => {
+								setSolveProgress(p);
+								setIsSolving(p !== null)
+							}}
 						/>
 					</div>
 					<CustomToggleButtonGroup
@@ -901,15 +970,34 @@ export default function Editor() {
 					onConfirm={handleLoadConfirm}
 					theme={mode}
 				/>
+				<LargePuzzleWarningDialog
+					open={largePuzzleWarningOpen}
+					onClose={() => setLargePuzzleWarningOpen(false)}
+					onConfirm={doStartAutoSolve}
+				/>
 				{/*底部功能栏*/}
-				<Stack direction="row">
+				<Stack direction="row" alignItems="center" spacing={2}>
 					<FormControlLabel control={<Checkbox checked={manuallySolve} onChange={handleManuallySolve}/>}
 														label="Solve Maunally"/>
-					<TextButton color="success" sx={{fontWeight: 'bolder'}} onClick={handleAutoSolve} disabled={isSolving}>
+					<TextButton size="large" color="success" sx={{fontWeight: 'bolder'}} onClick={handleAutoSolve}
+											disabled={isSolving}>
 						{autoSolve ? "Hide Solutions" : "Solve Automatically"}
 					</TextButton>
-					{/* --- 新增：解法切换控件 --- */}
-					{autoSolve && solutionsCount > 0 && (
+					{/* --- 求解进度条(大迷宫的时候才显示) --- */}
+					{isLargeMaze(panel.current) && isSolving && solveProgress !== null && (
+						<Box sx={{minWidth: 200, display: 'flex', alignItems: 'center', gap: 1}}>
+							<LinearProgress
+								variant="determinate"
+								value={solveProgress * 100}
+								sx={{flexGrow: 1, height: 8, borderRadius: 1}}
+							/>
+							<Typography variant="body2" color="text.secondary" sx={{minWidth: 45}}>
+								{`${Math.round(solveProgress * 100)}%`}
+							</Typography>
+						</Box>
+					)}
+					{/* --- 解法切换控件 --- */}
+					{!isSolving && autoSolve && solutionsCount > 0 && (
 						<Stack direction="row" alignItems="center" sx={{ml: 2, bgcolor: 'action.hover', borderRadius: 2, px: 1}}>
 							<IconButton size="small" onClick={handlePrevSolution}>
 								<NavigateBeforeIcon fontSize="small"/>

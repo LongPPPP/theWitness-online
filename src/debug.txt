@@ -56,3 +56,16 @@
 2026/1/14 21:58 eraser元素导致其他元素数量不对,有时候数量正确，有时候数量不正确
 
 2026/1/17 1:45 sizeDrag尺寸不正确，发现是div包裹svg多出来了看不见的节点，导致出现偏移
+
+2026/4/12 10:30 !important, 迷宫自动求解有问题，当迷宫很大的时候无法正确求解
+          10:50 经过排查，solve是异步函数(分发了多个task)，没等结果计算完就执行到下面去了，虽然之后计算出了解，但是没有显示解。
+
+          我现在要修改src/components/TheWitnessPuzzle/TheWitnessPuzzle.tsx，autoSolve中solve函数可能工作在同步，也可能工作在异步状态（具体取决于迷宫大小），我现在没法接受异步工作后的结果，f2函
+          数用于获取答案回调，f1用于计算进度，现在cachedSolutions.current = {puzzle, solutions: autoSolve(puzzle)};不能正确获取到结果，导致要显示answer的时候没能正确渲染。请修改
+
+          现在要在迷宫满足puzzle.width > 13 || puzzle.height > 13的时候，你还是根据根据panel判断好了，触发提示说迷宫太大may cause your browser to become
+            unresponsive。然后还要能显示求解进度，换句话说，TheWitnessPuzzle组件也要修改。进度条样式风格使用material ui。
+
+
+迷宫drag没能正确的同时移除两个对称的start/end
+placesymbol的时候没有正确的放置成对的start/end

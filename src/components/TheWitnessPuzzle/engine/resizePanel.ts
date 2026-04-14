@@ -272,6 +272,13 @@ export function resizePanel(
 			continue;
 		}
 
+		const isOnNewBoundary = (nx === 0 || nx === newW - 1 || ny === 0 || ny === newH - 1);
+
+		if (!isOnNewBoundary) {
+			console.log(`Endpoint (${nx},${ny}) is no longer on boundary after resize, dropped`);
+			continue;
+		}
+
 		// 检查其对称点在新坐标系中是否也在界内
 		if (hasSymX || hasSymY) {
 			const symOld = panel.get_sym_point(ep.GetX(), ep.GetY());

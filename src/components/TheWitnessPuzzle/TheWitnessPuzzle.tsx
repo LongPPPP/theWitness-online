@@ -95,6 +95,7 @@ interface PuzzleProps {
 	showSolution?: boolean;
 	solutionIndex?: number; // 外部传入显示第几个
 	onSolutionsFound?: (count: number) => void; // 求解后的回调
+	onSolveProgress?: (progress: number | null) => void; // 求解进度回调：null=未求解，0~100=进度百分比
 	symmetry?: PuzzleStyle; // TODO：作用性存疑，在Editor种是使用code来设置迷宫的,不过在generator中倒是可以使用
 }
 
@@ -103,15 +104,6 @@ type DragPosition = {
 	y: number;
 }
 
-function autoSolve(puzzle: Puzzle) {
-	const puzzleSolver = new PuzzleSolver(puzzle)
-	const f1 = () => {
-	}
-	const f2 = () => {
-	}
-	return puzzleSolver.solve(f1, f2);
-
-}
 
 /**
  * 若symmetry含有Pillar，则必须保证width为偶数
@@ -167,6 +159,7 @@ const TheWitnessPuzzle = (
 		PIDBase64,
 		solutionIndex,
 		onSolutionsFound,
+		onSolveProgress,
 		symmetry = 'None',
 	}: PuzzleProps
 ) => {
@@ -179,13 +172,15 @@ const TheWitnessPuzzle = (
 	const generator = useRef<Generator>(null) // generator 生成 panel
 	const panel = useRef<Panel>(null) // panel 包含迷宫的所有基本属性.可以转换成puzzle
 	const [puzzle, setPuzzle] = useState<Puzzle>(null) // puzzle 用于渲染,交互
+	const [solveTick, setSolveTick] = useState<number>(0); // 异步求解完成时递增，触发重渲染
 	const dragging = useRef<DragPosition | null>(null);
 	const prvBase64 = useRef<string>(null); // 防止传出的base64code再传入重复触发更新，导致死循环
 	const generatorSolution = useRef<Array<(number | { x: number, y: number })>[]>(null);
 	const cachedSolutions = useRef<{
 		puzzle: Puzzle;
-		solutions: Array<(number | { x: number, y: number })[]>
+		solutions: Array<(number | { x: number, y: number })[]> | null; // null = 求解进行中
 	} | null>(null);
+	const solverRef = useRef<PuzzleSolver | null>(null);
 	const {config} = usePuzzleConfig();
 
 	// init puzzle
@@ -321,22 +316,51 @@ const TheWitnessPuzzle = (
 		// ✅ 修复：求解前清除手动解谜留下的线段状态
 		puzzle.clearLines();
 
-		// 情况 B: 懒计算 —— 只在 showSolution=true 时才算，puzzle 没变就用缓存
-		if (cachedSolutions.current?.puzzle !== puzzle) {
-			console.info("正在计算谜题解法...");
-			cachedSolutions.current = {puzzle, solutions: autoSolve(puzzle)};
-		}
-
-		const solutions = cachedSolutions.current.solutions;
-		if (solutions.length > 0) {
+		// 情况 B: 缓存命中 —— 解已就绪
+		if (cachedSolutions.current?.puzzle === puzzle && cachedSolutions.current.solutions !== null) {
+			const solutions = cachedSolutions.current.solutions;
 			onSolutionsFound?.(solutions.length);
-			const idx = Math.min(Math.max(0, solutionIndex || 0), solutions.length - 1);
-			PuzzleSolver.drawPath(puzzle, solutions[idx], puzzleElem);
-		} else {
-			onSolutionsFound?.(0);
+			if (solutions.length > 0) {
+				const idx = Math.min(Math.max(0, solutionIndex || 0), solutions.length - 1);
+				PuzzleSolver.drawPath(puzzle, solutions[idx], puzzleElem);
+			}
+			return;
 		}
 
-	}, [puzzle, showSolution, solutionIndex, onSolutionsFound]);
+		// 情况 C: 当前 puzzle 正在求解中，等待异步回调
+		if (cachedSolutions.current?.puzzle === puzzle) return;
+
+		// 情况 D: 启动新一轮求解
+		if (solverRef.current) {
+			solverRef.current.cancelSolving();
+			solverRef.current = null;
+		}
+		cachedSolutions.current = {puzzle, solutions: null};
+		console.info("正在发布计算谜题任务...");
+
+		const solver = new PuzzleSolver(puzzle);
+		solverRef.current = solver;
+		solver.solve(
+			(progress) => {
+				onSolveProgress?.(progress);
+			},
+			(paths) => {
+				// 同步或异步完成后均走此分支
+				if (cachedSolutions.current?.puzzle === puzzle) {
+					cachedSolutions.current = {puzzle, solutions: paths};
+				}
+				solverRef.current = null;
+				onSolveProgress?.(null);
+				setSolveTick(t => t + 1); // 触发重渲染，进入情况 B
+			}
+		);
+
+		return () => {
+			// effect 因依赖变化而重跑前，若求解仍在进行则取消
+			solverRef.current?.cancelSolving();
+			solverRef.current = null;
+		};
+	}, [puzzle, showSolution, solutionIndex, onSolutionsFound, solveTick]);
 
 	// 当config变化的时候设置puzzle的config
 	useEffect(() => {

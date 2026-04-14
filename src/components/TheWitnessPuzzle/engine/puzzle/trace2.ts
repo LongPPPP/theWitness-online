@@ -5,23 +5,29 @@ import * as Utils from "./utils.ts"
 import {validate} from "./validate.ts";
 import type {Cell, LineCell} from "./cell.ts";
 
+/**
+ * 全局追踪状态记录表。
+ * 所有TheWitnessPuzzle模块共享这一个单例对象，所有函数通过读写 data 来传递状态，
+ * 而非通过函数参数。
+ * 换句话说，只能同时trace一个迷宫
+ */
 type DataRecord = {
-    tracing?: boolean;
-    wittleTracing?: boolean;
-    svg?: SVGSVGElement;
-    cursor?: HTMLElement | SVGElement | null;
-    x?: number;
-    y?: number;
-    pos?: { x: number; y: number };
-    sym?: { x: number; y: number };
-    lastTouchPos?: { x: number; y: number };
-    puzzle?: Puzzle;
-    path?: PathSegment[];
-    symbbox?: BoundingBox,
-    bbox?: BoundingBox,
-    start?: SVGElement
-    symcursor?: SVGElement
-    animations?: CSSStyleSheet
+    tracing?: boolean;                          // 当前是否正在追踪（鼠标/触摸按下并移动中）
+    wittleTracing?: boolean;                    // 是否使用 wittle 模式（一种更灵敏的追踪模式，影响 push 的重定向比率）
+    svg?: SVGSVGElement;                        // 当前谜题所在的 SVG 根元素
+    cursor?: HTMLElement | SVGElement | null;   // 跟随鼠标的光标圆圈 SVG 元素
+    x?: number;                                 // 光标当前的 SVG 像素 x 坐标
+    y?: number;                                 // 光标当前的 SVG 像素 y 坐标
+    pos?: { x: number; y: number };             // 光标当前所在格子的网格坐标（整数）
+    sym?: { x: number; y: number };             // 对称模式下，对称光标对应的网格坐标
+    lastTouchPos?: { x: number; y: number };    // 上一帧触摸位置，用于计算触摸移动增量
+    puzzle?: Puzzle;                            // 当前谜题对象的引用
+    path?: PathSegment[];                       // 已走过的路径段数组，每进入一个新格子就 push 一个 PathSegment
+    symbbox?: BoundingBox,                      // 对称光标对应格子的像素包围盒
+    bbox?: BoundingBox,                         // 主光标当前所在格子的像素包围盒
+    start?: SVGElement                          // 起点圆圈 SVG 元素的引用
+    symcursor?: SVGElement                      // 对称模式下的第二个光标圆圈 SVG 元素
+    animations?: CSSStyleSheet                  // 用于插入/删除 CSS 动画规则的样式表引用
 
     // [key: string]: any; // 索引签名：允许添加任意键名的属性
 }
@@ -35,6 +41,21 @@ const MOVE_RIGHT = 2
 const MOVE_TOP = 3
 const MOVE_BOTTOM = 4
 
+/**
+ * 表示当前光标所在格子的像素包围盒（Bounding Box）。
+ *
+ * 网格中每个格子在 SVG 像素坐标系中都有固定大小：
+ *   - 交叉点（node，x%2==0 && y%2==0）：24×24px
+ *   - 水平通道（x%2==1 && y%2==0）：82×24px（宽58+左右各12）
+ *   - 垂直通道（x%2==0 && y%2==1）：24×82px
+ *
+ * BoundingBox 有两套坐标：
+ *   - raw：格子本身的原始像素边界，是 shift() 操作的基准
+ *   - x1/x2/y1/y2：对外暴露的实际边界，在 raw 基础上会因端点方向额外扩展 24px
+ *
+ * 每次光标跨越格子边界，changePos() 就会调用 shift() 让 bbox 平移到新格子，
+ * 从而始终与 data.pos 描述的网格位置保持同步。
+ */
 class BoundingBox {
     private static BBOX_DEBUG = false;
     raw: { x1: number; x2: number; y1: number; y2: number };
@@ -132,6 +153,20 @@ class BoundingBox {
     }
 }
 
+/**
+ * 表示路径上的一个格子段，负责该格子内所有 SVG 元素的创建、更新和销毁。
+ *
+ * 每当光标进入一个新格子，onMove() 就 push 一个新的 PathSegment；
+ * 回退时则 pop 并调用 destroy() 清除对应的 SVG 元素。
+ *
+ * 每个 PathSegment 由以下 SVG 元素组成：
+ *   - poly1：从进入方向的格子边界到 middle 的矩形（"前半段"）
+ *   - circ：格子 middle 处的圆圈（进入新格子时的"衔接圆"）
+ *   - poly2：从 middle 到当前光标位置的矩形（"后半段"，跟随光标实时更新）
+ *   - pillarCirc：柱形谜题（pillar）模式下用于遮盖接缝的额外圆圈
+ *
+ * 对称模式下，每个元素都有对应的 sym* 版本（symPoly1、symCirc 等）。
+ */
 class PathSegment {
     poly1: SVGElement
     circ: SVGElement
@@ -385,10 +420,32 @@ class PathSegment {
     }
 }
 
+/**
+ * 将 value 夹在 [min, max] 区间内。
+ */
 function clamp(value: number, min: number, max: number) {
     return value < min ? min : value > max ? max : value
 }
 
+/**
+ * 每帧鼠标/触摸移动时调用的核心函数，驱动整个追踪系统。
+ *
+ * 执行顺序：
+ *   1. pushCursor / pushCursorWittle：将鼠标的原始 dx/dy 重定向，
+ *      确保光标沿合法通道移动（处理外壁、内壁、交叉点转向）。
+ *   2. 进入 while 循环，循环内每轮：
+ *      a. hardCollision：检查 gap/对称线/起点碰撞，截断不合法的越界。
+ *      b. move：检测光标是否越过格子边界，若越过则返回方向。
+ *      c. redraw：用当前光标位置更新当前格子的 SVG 路径。
+ *      d. 若 move 返回 MOVE_NONE，退出循环。
+ *      e. 若是回退方向，pop 路径并清除旧格子标记。
+ *      f. changePos：更新 data.pos 和 data.bbox 到新格子。
+ *      g. 若是前进，push 新 PathSegment 并标记新格子已访问。
+ *   （循环允许单帧内跨越多个格子，例如鼠标速度极快时）
+ *
+ * @param dx 本帧鼠标/触摸在 x 方向的移动量（已乘以灵敏度系数）
+ * @param dy 本帧鼠标/触摸在 y 方向的移动量（已乘以灵敏度系数）
+ */
 export function onMove(dx: number, dy: number) {
     let collidedWith: string;
     {
@@ -409,7 +466,7 @@ export function onMove(dx: number, dy: number) {
         // Potentially move the location to a new cell, and make absolute boundary checks
         const moveDir = move();
         data.path[data.path.length - 1].redraw()
-        if (moveDir === MOVE_NONE) break
+        if (moveDir === MOVE_NONE) break // 没有跨格，本帧处理完毕
         console.debug('Moved', ['none', 'left', 'right', 'top', 'bottom'][moveDir])
 
         // Potentially adjust data.x/data.y if our position went around a pillar
@@ -802,6 +859,26 @@ function pushCursorWittle(dx: number, dy: number) {
 
 // Redirect momentum from pushing against walls, so that all further moment steps
 // will be strictly linear. Returns a string for logging purposes only.
+/**
+ * 标准模式下的光标动量重定向函数。
+ *
+ * 每帧调用一次，在鼠标原始 dx/dy 被应用到 data.x/data.y 之前，
+ * 根据当前格子类型和碰撞情况决定如何重定向动量：
+ *
+ *   - 外壁碰撞：相邻格不可走 → 把垂直于壁的动量转给平行方向（滑壁效果）
+ *   - 通道内壁：水平/垂直通道两侧被封死 → 把垂直通道的动量转给通道方向
+ *   - 交叉点：分两步：① 先把侧向动量转给前进方向（吸附到中心线）；
+ *             ② 若本帧动量大到飞越中心（overshot），且 y 方向为主导，
+ *                则把超出量转给 y 并把 x 锁回中心（实现平滑转向）
+ *   - 无碰撞：取 dx/dy 中绝对值更大的分量，严格单轴移动
+ *
+ * 与 wittle 版本的差异：外壁 targetDir 固定为 'top'/'right'，
+ * 不考虑鼠标的实际移动方向。
+ *
+ * @param dx 本帧 x 方向移动量
+ * @param dy 本帧 y 方向移动量
+ * @returns  碰撞描述字符串（仅用于调试日志）
+ */
 function pushCursor(dx: number, dy: number) {
     // Outer wall collision
     const cell = data.puzzle.getCell(data.pos.x, data.pos.y) as LineCell;
@@ -907,6 +984,18 @@ function pushCursor(dx: number, dy: number) {
 
 // Check to see if we collided with any gaps, or with a symmetrical line, or a startpoint.
 // In any case, abruptly zero momentum.
+/**
+ * 检测 gap（断开）、对称线自交、起点重叠等"硬碰撞"，并截断光标位置。
+ *
+ * 与 pushCursor 处理的"软碰撞"（外壁/内壁/转向）不同，
+ * 硬碰撞会立即且强制地把光标锁在 middle 附近，不允许任何动量穿越。
+ *
+ * 触发场景：
+ *   - 当前格子有 GAP_BREAK（半断开）：gapSize = 21
+ *   - 下一格是另一个已有线的起点：gapSize = -5（允许轻微超出以贴合视觉）
+ *   - 对称模式下，主路径与对称路径的网格坐标重合：gapSize = 13
+ *   - 对称路径的对应格子有 GAP_BREAK：gapSize = 21
+ */
 function hardCollision() {
     const lastDir = data.path[data.path.length - 1].dir;
     const cell = data.puzzle.getCell(data.pos.x, data.pos.y) as LineCell;
@@ -952,6 +1041,23 @@ function hardCollision() {
 // Check to see if we've gone beyond the edge of puzzle cell, and if the next cell is safe,
 // i.e. not out of bounds. Reports the direction we are going to move (or none),
 // but does not actually change data.pos
+/**
+ * 检测光标是否越过了当前格子的绝对边界，并判断能否进入相邻格子。
+ *
+ * 检测逻辑（以向左为例）：
+ *   1. 若 data.x < bbox.x1 + 12（光标进入左侧触发区）：
+ *      a. 查询左侧格子（getCell(pos.x-1, pos.y)）
+ *      b. 若为 null / 非 line 类型 / GAP_FULL → clamp，阻止穿越
+ *      c. 若左侧格子已有线且不是从左边回来 → clamp（防止穿越自己的路径）
+ *      d. 对称模式下对称格子同样检查
+ *      e. 经过以上夹断后，若 data.x 仍 < bbox.x1 → return MOVE_LEFT（触发跨格）
+ *   2. 其他三个方向同理
+ *   3. 四个方向都不触发 → return MOVE_NONE
+ *
+ * 注意：此函数只报告方向，不修改 data.pos 或 bbox，由调用方 onMove() 处理。
+ *
+ * @returns MOVE_LEFT / MOVE_RIGHT / MOVE_TOP / MOVE_BOTTOM / MOVE_NONE
+ */
 function move() {
     let symCell: Cell;
     let cell: Cell;
