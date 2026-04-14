@@ -188,7 +188,12 @@ const SymbolList = ({
                   </Box>
 							}
 						</Stack>
-						<Stack>
+						<Stack
+							sx={{
+								marginLeft: 'auto', // 关键：自动占满左侧剩余空间，实现右对齐
+								alignItems: 'center', // 垂直居中（让图标和输入框对齐更美观）
+							}}
+						>
 							{/* isDeleting为false时显示NumberField */}
 							<NumberField
 								min={1}
@@ -201,12 +206,14 @@ const SymbolList = ({
 							/>
 							{/* isDeleting为true时显示删除图标 */}
 							{isDeleting && (
-								<IconButton><HighlightOffIcon
-									color={'error'}
-									fontSize={'large'}
-									style={{cursor: 'pointer'}}
+								<IconButton
+									size="small"
+									color="error"
 									onClick={() => onClickDelete(symbol.id)}
-								/></IconButton>
+									sx={{borderRadius: "6px"}}
+								>
+									<HighlightOffIcon fontSize="medium"/>
+								</IconButton>
 							)}
 						</Stack>
 					</Stack>
@@ -262,9 +269,9 @@ function ElementSelectPanel({onElementChange}: { onElementChange: (symbolList: E
 	const id = useRef(1);
 	const [isDeleting, setIsDeleting] = useState(false);
 
-	// const handleDelete = useCallback((itemId: number) => {
-	// 	setSymbolList(prevList => prevList.filter(item => item.id !== itemId));
-	// }, [])
+	const handleDeleteItem = useCallback((itemId: number) => {
+		setSymbolList(prevList => prevList.filter(item => item.id !== itemId));
+	}, [])
 
 	const handleColorSelect = useCallback((itemId: number, color: string) => {
 		setSymbolList(symbolList.map(item => item.id === itemId ? {...item, color: color} : item));
@@ -387,7 +394,7 @@ function ElementSelectPanel({onElementChange}: { onElementChange: (symbolList: E
 				<SymbolList
 					symbolList={symbolList}
 					isDeleting={isDeleting}
-					onClickDelete={handleDelete}
+					onClickDelete={handleDeleteItem}
 					onSelectColor={handleColorSelect}
 					onNumberChange={handleNumberSelect}
 				/>
@@ -498,7 +505,8 @@ export default function Randomizer() {
 					<TextButton variant="contained" size="medium" onClick={() => {
 						setShowSolution(prevState => !prevState)
 					}}>Solution</TextButton>
-					<TextButton variant="outlined" startIcon={<EditIcon />} onClick={handleEditInEditor} disabled={!currentCode}>Edit in Editor</TextButton>
+					<TextButton variant="outlined" startIcon={<EditIcon/>} onClick={handleEditInEditor} disabled={!currentCode}>Edit
+						in Editor</TextButton>
 					{/*<TextField*/}
 					{/*	error*/}
 					{/*	id="puzzle-base64-field"*/}
