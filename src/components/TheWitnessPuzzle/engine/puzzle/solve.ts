@@ -115,6 +115,10 @@ export default class PuzzleSolver {
 	solve(partialCallback: (solutionCount: number) => void, finalCallback: (paths: Path[]) => void): Path[] {
 		if (this.task != null) throw Error('Cannot start another solve() while one is already in progress')
 		const puzzle = this.puzzle;
+
+		// 前置校验：谜题结构必须合法，否则提前报错
+		PuzzleSolver.validatePuzzleStructure(puzzle);
+
 		const start = (new Date()).getTime();
 
 		const startPoints = [];
@@ -545,6 +549,53 @@ export default class PuzzleSolver {
 				output += dir.padEnd(5, ' ') + '|'
 			}
 			console.log(output)
+		}
+	}
+
+	/**
+	 * 求解前的谜题合法性校验。
+	 * 检测会导致 solve() 陷入死循环或逻辑错误的配置，提前抛出错误。
+	 *
+	 * 校验规则：
+	 * 1. 必须至少存在一个起点（start === true）。
+	 * 2. 必须至少存在一个终点（end != null）。
+	 * 3. 若谜题为对称模式（symmetry != null），起点和终点数量必须均为偶数，
+	 *    因为对称路径要求两条路同时存在，start/end 必须成对出现。
+	 *
+	 * @throws {Error} 当谜题配置不合法时抛出，携带具体原因。
+	 */
+	static validatePuzzleStructure(puzzle: Puzzle): void {
+		let numStarts = 0;
+		let numEnds = 0;
+
+		for (let x = 0; x < puzzle.width; x++) {
+			for (let y = 0; y < puzzle.height; y++) {
+				const cell = puzzle.getLineCell(x, y);
+				if (cell == null) continue;
+				if (cell.start === true) numStarts++;
+				if (cell.end != null) numEnds++;
+			}
+		}
+
+		if (numStarts === 0) {
+			throw new Error('Puzzle has no start points — solve() would produce no results.');
+		}
+
+		if (numEnds === 0) {
+			throw new Error('Puzzle has no end points — solve() would loop indefinitely.');
+		}
+
+		if (puzzle.symmetry != null) {
+			if (numStarts % 2 !== 0) {
+				throw new Error(
+					`Symmetry puzzle requires an even number of start points, but found ${numStarts}.`
+				);
+			}
+			if (numEnds % 2 !== 0) {
+				throw new Error(
+					`Symmetry puzzle requires an even number of end points, but found ${numEnds}.`
+				);
+			}
 		}
 	}
 
