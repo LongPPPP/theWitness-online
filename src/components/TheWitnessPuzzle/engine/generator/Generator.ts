@@ -477,8 +477,9 @@ export class Generator {
         //     solution.push(row.toString());
         // }
         // console.debug(solution)
+
         //Attempt to add the symbols
-        if (!this.place_all_symbols(symbols)) //TODO:关键函数
+        if (!this.place_all_symbols(symbols))
             return false;
 
         if (!this.hasFlag(Config.DisableWrite)) this.setAllStyles();
@@ -577,7 +578,7 @@ export class Generator {
         if (this.hasFlag(Config.LongPath) || symbols.style === Panel.Styles.HAS_DOTS && !this.hasFlag(Config.PreserveStructure) &&
             !(this._panel.symmetry === Panel.Symmetry.Vertical && (Math.trunc(this._panel.Width / 2)) % 2 === 0 ||
                 this._panel.symmetry === Panel.Symmetry.Horizontal && (Math.trunc(this._panel.Height / 2)) % 2 === 0)) {
-            return this.generate_path_length(this._panel.get_num_grid_points() * 7 / 8);
+            return this.generate_path_length(Math.trunc(this._panel.get_num_grid_points() * 7 / 8));
         }
 
         //For stone puzzles, the path must have a certain number of regions
@@ -625,6 +626,8 @@ export class Generator {
 
     /**
      * Generate a path with the provided number of regions.
+     *
+     * 因为终点一定在边界上，于是只有 “边缘→内部” 的移动一定会再次回到边界上，那么这样就会新增区域
      */
     private generate_path_regions(minRegions: number): boolean {
         let fails = 0;
@@ -1053,6 +1056,17 @@ export class Generator {
 
     /**
      * Place the given amount of stones with the given color
+     *
+     * 考虑区域a,b,c 其中 a-b 相邻、b-c 相邻、a-c 不相邻
+     *
+     * 第1轮放置:
+     * 随机选中区域 c → 校验合法 → 放置stone → 把c区域剩余可以放stone的格子存到open2 → 屏蔽 c 区域 + c 的邻居 b 区域
+     *
+     * 第2轮放置:
+     * 只能从剩余的 a 区域 选点放stone
+     *
+     * 第3~N轮放置:
+     * 没有剩余区域可以放置 → 在open2中选取点放置stone（open2中的点一定可以放置这个颜色的stone）
      */
     private place_stones(color: number, amount: number): boolean {
         const open = new SortedSet<Point>(this._openpos);
@@ -1520,6 +1534,15 @@ export class Generator {
 
     /**
      * Place the given amount of stars with the given color
+     *
+     * 星星必须成对出现(同色星星必须 2 个一组，放在同一个独立区域内)
+     *
+     * 考虑区域a,b,c 其中 a-b 相邻、b-c 相邻、a-c 不相邻 c区域中有一个和star颜色相同的stone, 只放置一个star
+     *
+     * 第1轮放置:尝试放在a区域 → count(区域中和star颜色相同的元素个数) === 0 && amount(star的数量) === 1 → continue
+     *
+     * 第2轮放置:尝试放在c区域 → 区域中元素个数 <=2 并且 区域空间足够 → 放置star
+     *
      */
     private place_stars(color: number, amount: number): boolean {
         const open = new SortedSet<Point>(this._openpos);

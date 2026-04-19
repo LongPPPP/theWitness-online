@@ -28,8 +28,6 @@ type DataRecord = {
     start?: SVGElement                          // 起点圆圈 SVG 元素的引用
     symcursor?: SVGElement                      // 对称模式下的第二个光标圆圈 SVG 元素
     animations?: CSSStyleSheet                  // 用于插入/删除 CSS 动画规则的样式表引用
-
-    // [key: string]: any; // 索引签名：允许添加任意键名的属性
 }
 
 const data: DataRecord = {}
