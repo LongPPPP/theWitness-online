@@ -45,7 +45,7 @@ export default function SymbolSVG({
 			polyshape: symbol.polyshape,
 			color: symbol.color ?? theme.palette.text.primary,
 			rot: symbol.rot,
-		}, false);
+		}, 1, false);
 		eRef.current.innerHTML = '';
 		eRef.current.appendChild(svgElement);
 	}, [defaultSymbol, theme])

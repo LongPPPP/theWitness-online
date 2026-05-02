@@ -27,7 +27,7 @@ export function createElement(type: string) {
     return document.createElementNS('http://www.w3.org/2000/svg', type)
 }
 
-export function drawSymbol(params: Params, customMechanics: boolean) {
+export function drawSymbol(params: Params, p0: number, customMechanics: boolean) {
     const svg = createElement('svg')
     svg.setAttribute('viewBox', '0 0 ' + params.width + ' ' + params.height)
     if (!params.x) params.x = 0

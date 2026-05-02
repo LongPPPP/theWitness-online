@@ -7,6 +7,7 @@ export type PuzzleConfig = {
     sensitivity: number,
     enableEndHints: boolean,
     wittleTracing: boolean,
+    scale: number,
     onSuccess: (x: number, y: number) => void,
 }
 
@@ -15,6 +16,7 @@ const DEFAULT_CONFIG: PuzzleConfig = {
     sensitivity: 0.7,
     enableEndHints: true,
     wittleTracing: true,
+    scale: 1,
     onSuccess: () => {
     },
 }

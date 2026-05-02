@@ -16,8 +16,8 @@ type DataRecord = {
     wittleTracing?: boolean;                    // 是否使用 wittle 模式（一种更灵敏的追踪模式，影响 push 的重定向比率）
     svg?: SVGSVGElement;                        // 当前谜题所在的 SVG 根元素
     cursor?: HTMLElement | SVGElement | null;   // 跟随鼠标的光标圆圈 SVG 元素
-    x?: number;                                 // 光标当前的 SVG 像素 x 坐标
-    y?: number;                                 // 光标当前的 SVG 像素 y 坐标
+    x?: number;                                 // 光标当前的 SVG 像素 x 坐标（逻辑坐标）
+    y?: number;                                 // 光标当前的 SVG 像素 y 坐标（逻辑坐标）
     pos?: { x: number; y: number };             // 光标当前所在格子的网格坐标（整数）
     sym?: { x: number; y: number };             // 对称模式下，对称光标对应的网格坐标
     lastTouchPos?: { x: number; y: number };    // 上一帧触摸位置，用于计算触摸移动增量
@@ -152,7 +152,7 @@ class BoundingBox {
 }
 
 /**
- * 表示路径上的一个格子段，负责该格子内所有 SVG 元素的创建、更新和销毁。
+ * 这个类处理了关键的路径绘制，当光标移动的时候使用redraw函数绘制道路片段
  *
  * 每当光标进入一个新格子，onMove() 就 push 一个新的 PathSegment；
  * 回退时则 pop 并调用 destroy() 清除对应的 SVG 元素。
@@ -418,9 +418,6 @@ class PathSegment {
     }
 }
 
-/**
- * 将 value 夹在 [min, max] 区间内。
- */
 function clamp(value: number, min: number, max: number) {
     return value < min ? min : value > max ? max : value
 }
@@ -982,18 +979,6 @@ function pushCursor(dx: number, dy: number) {
 
 // Check to see if we collided with any gaps, or with a symmetrical line, or a startpoint.
 // In any case, abruptly zero momentum.
-/**
- * 检测 gap（断开）、对称线自交、起点重叠等"硬碰撞"，并截断光标位置。
- *
- * 与 pushCursor 处理的"软碰撞"（外壁/内壁/转向）不同，
- * 硬碰撞会立即且强制地把光标锁在 middle 附近，不允许任何动量穿越。
- *
- * 触发场景：
- *   - 当前格子有 GAP_BREAK（半断开）：gapSize = 21
- *   - 下一格是另一个已有线的起点：gapSize = -5（允许轻微超出以贴合视觉）
- *   - 对称模式下，主路径与对称路径的网格坐标重合：gapSize = 13
- *   - 对称路径的对应格子有 GAP_BREAK：gapSize = 21
- */
 function hardCollision() {
     const lastDir = data.path[data.path.length - 1].dir;
     const cell = data.puzzle.getCell(data.pos.x, data.pos.y) as LineCell;
@@ -1052,7 +1037,7 @@ function hardCollision() {
  *   2. 其他三个方向同理
  *   3. 四个方向都不触发 → return MOVE_NONE
  *
- * 注意：此函数只报告方向，不修改 data.pos 或 bbox，由调用方 onMove() 处理。
+ * 注意：此函数只报告方向，不修改 data.pos 或 bbox，但是碰撞的时候修改data.x和data.y
  *
  * @returns MOVE_LEFT / MOVE_RIGHT / MOVE_TOP / MOVE_BOTTOM / MOVE_NONE
  */

@@ -16,3 +16,5 @@
 15.修复Generator页面若显示解，再改变迷宫大小则会报错 ✅️2026/4/14/19:21
 16.Randomizer为中在每个选择的元素后添加删除按钮（平时不显示）
 17.为TheWitnessPuzzle适配移动端
+(1)在puzzle.ts中的config字段添加scale
+(2)在display2.ts中的draw函数为包裹所有svg的svg设置scale属性。

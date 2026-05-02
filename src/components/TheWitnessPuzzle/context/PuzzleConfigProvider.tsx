@@ -7,6 +7,7 @@ export default function PuzzleConfigProvider({children}) {
 		volume: 0.5,
 		sensitivity: 0.7,
 		enableEndHints: true,
+		scale: 1,
 		onSuccess: () => {
 		},
 		wittleTracing: true,
