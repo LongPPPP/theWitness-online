@@ -5,7 +5,7 @@ import {Box, CssBaseline} from "@mui/material";
 import {ThemeModeProvider} from "./components/contexts/ThemeContext.tsx";
 import Editor from "@/pages/Editor.tsx";
 import Randomizer from "@/pages/Randomizer.tsx";
-import {BrowserRouter as Router, Route, Routes, useLocation} from "react-router-dom";
+import {HashRouter as Router, Route, Routes, useLocation} from "react-router-dom";
 import Homepage from "@/pages/Homepage.tsx";
 import Test from "@/pages/Test.tsx";
 import Test2 from "@/pages/Test2.tsx";
