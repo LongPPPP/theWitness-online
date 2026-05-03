@@ -238,7 +238,7 @@ type ElementItem = (SVGParams & { id: number, num: number })
 const defaultSymbolList: SVGParams[] = [
 	{type: 'start', title: 'Start point'},
 	{type: 'end', 'y': 18, 'dir': 'top', title: 'End point'},
-	{type: 'gap', title: 'Line break', color: '#000000'},
+	{type: 'gap', title: 'Line break'},
 	{type: 'dot', title: 'Dot', color: '#000000'},
 	{type: 'square', title: 'Square', color: '#000000'},
 	{type: 'star', title: 'Star', color: '#000000'},
