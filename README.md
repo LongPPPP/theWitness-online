@@ -1,75 +1,54 @@
-# React + TypeScript + Vite
+# The Witness Puzzle Solver
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+一个 React 19 + TypeScript + Vite 应用，模拟 **The Witness** 解谜游戏 —— 用户可创建、编辑、随机生成并解决网格路径谜题。
 
-Currently, two official plugins are available:
+## 基准测试：求解器剪枝优化
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+该基准比较了 **baseline 求解器（无剪枝）** 与 **剪枝求解器（启用分支剪枝）** 在各种谜题配置下的表现。
 
-## React Compiler
+### 字段说明
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+| Field | 说明 |
+|-------|------|
+| **Puzzle** | 谜题名称 / 描述 |
+| **Size** | 网格尺寸（宽 × 高） |
+| **Nodes(no)** | baseline 求解器访问的搜索节点总数 |
+| **Nodes(pr)** | 剪枝求解器访问的搜索节点总数 |
+| **Saved%** | 节点剪枝比例：`(1 - Nodes(pr) / Nodes(no)) × 100%` |
+| **Checks** | 剪枝求解器执行的约束检查次数 |
+| **Pruned** | 被剪枝（提前截断）的分支数量 |
+| **SolNo** | baseline 求解器找到的解的数量 |
+| **SolPr** | 剪枝求解器找到的解的数量 |
+| **t(no)ms** | baseline 求解器总运行时间（毫秒） |
+| **t(pr)ms** | 剪枝求解器总运行时间（毫秒） |
+| **SpdUp** | 加速比：`t(no)ms / t(pr)ms`（越大越好；< 1.00 表示剪枝反而更慢） |
 
-Note: This will impact Vite dev & build performances.
+### 测试结果
 
-## Expanding the ESLint configuration
+```
+Max solutions per run: 10,000
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Puzzle                          Size  Nodes(no)  Nodes(pr)   Saved%    Checks    Pruned  SolNo  SolPr   t(no)ms   t(pr)ms  SpdUp
+--------                        ----  ---------  ---------   ------   -------   -------  -----  -----   -------   -------  -----
+2x2 trivial (baseline)           2x2        297        209    29.6%        20         0     12     12      0.00      0.00   1.00x
+2x2 with gap                     2x2        173        143    17.3%        10         0      7      7      0.00      0.00   1.00x
+3x3 open                         3x3       8829       4277    51.6%       364         0    184    184      0.00      1.00   1.00x
+3x3 gaps                         3x3        323        195    39.6%         8         0      6      6      0.00      0.00   1.00x
+3x3 2x red square                3x3       8829       4277    51.6%       364         0    184    184      0.00      1.00   1.00x
+3x3 mixed squares                3x3       8829       3485    60.5%       364       142     40     40      0.00      1.00   1.00x
+3x3 red star pair                3x3       8829       2349    73.4%       268       136     68     68      0.90      0.00   1.00x
+3x3 star+extra                   3x3       8829       2713    69.3%       268       114     20     20      1.00      0.00   1.00x
+4x4 star pair                    4x4     692921     101693    85.3%      9670      4274   2700   2700     20.05     14.00   1.43x
+4x4 squares+stars                4x4     429703      38757    91.0%      3944      2140   1619    695     11.00      5.00   2.20x
+5x5 star pair (far)              5x5    6173355     370747    94.0%     29448      9448  10000  10000    149.51     84.15   1.78x
+5x5 star pair (mid)              5x5    4600109     394547    91.4%     27901      7900  10000  10000    163.27     65.14   2.51x
+5x5 dual star pairs              5x5  152492443    1317657    99.1%    144752    130020   7368   7368   4121.87    284.95  14.47x
+5x5 3-color squares              5x5    3210371     646103    79.9%     42804     11401  10000  10000    144.73    148.29   0.98x
+5x5 star+square full             5x5    5425443    1770163    67.4%    201412    159141  10000  10000    218.70    368.52   0.59x
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### 关键结论
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- **约束强的谜题剪枝效果显著**：`5x5 dual star pairs` 获得了 **14.47× 加速比**，节点数减少 **99.1%** —— 剪枝求解器仅访问 130 万节点，而无剪枝需要访问 1.52 亿。
+- **约束弱的谜题存在额外开销**：`5x5 star+square full` 出现 **0.59× 减速**，因为大多数分支都是有效的，约束检查的开销超过了剪枝带来的收益。
+- **对称与配对约束获益最大**：包含星形配对、颜色匹配或多色约束的谜题，剪枝优化的增益最为显著。
