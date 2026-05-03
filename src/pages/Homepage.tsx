@@ -11,10 +11,10 @@ const Homepage: React.FC = () => {
 	// 背景图片随机加载逻辑
 	useEffect(() => {
 		const images = [
-			'/bg_witness_1.jpg', // 请确保这些图片存在于 public 文件夹中
-			'/bg_witness_2.jpg',
-			'/bg_witness_3.jpg',
-			'/bg_witness_4.jpg'
+			`${import.meta.env.BASE_URL}bg_witness_1.jpg`,
+			`${import.meta.env.BASE_URL}bg_witness_2.jpg`,
+			`${import.meta.env.BASE_URL}bg_witness_3.jpg`,
+			`${import.meta.env.BASE_URL}bg_witness_4.jpg`
 		];
 		const randomIdx = Math.floor(Math.random() * images.length);
 		setBgImage(images[randomIdx]);

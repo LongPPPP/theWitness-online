@@ -238,6 +238,7 @@ export default function MultiPaperNav() {
 						color="primary"
 						size="medium"
 						sx={{mr: (theme) => theme.spacing(2)}}
+						onClick={() => window.open('https://github.com/LongPPPP/theWitness-online', '_blank')}
 					>
 						<GitHubIcon/>
 					</PrimaryButton>
