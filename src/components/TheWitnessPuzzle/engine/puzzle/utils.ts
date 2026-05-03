@@ -1,10 +1,14 @@
-const soundTracks = {
-    'start': new Audio('src/assets/sound/panel_start_tracing.aac'),
-    'success': new Audio('src/assets/sound/panel_success.aac'),
-    'fail': new Audio('src/assets/sound/panel_failure.aac'),
-    'abort': new Audio('src/assets/sound/panel_abort_tracing.aac'),
-}
+import startSound from '@/assets/sound/panel_start_tracing.aac'
+import successSound from '@/assets/sound/panel_success.aac'
+import failSound from '@/assets/sound/panel_failure.aac'
+import abortSound from '@/assets/sound/panel_abort_tracing.aac'
 
+const soundTracks = {
+    'start': new Audio(startSound),
+    'success': new Audio(successSound),
+    'fail': new Audio(failSound),
+    'abort': new Audio(abortSound),
+}
 let currentAudio = null
 
 export function PLAY_SOUND(name: 'start' | 'success' | 'fail' | 'abort', volume: number): void {
