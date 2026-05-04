@@ -2,6 +2,10 @@
 
 一个 React 19 + TypeScript + Vite 应用，模拟 **The Witness** 解谜游戏 —— 用户可创建、编辑、随机生成并解决网格路径谜题。
 
+## 立即尝试
+
+https://longpppp.github.io/theWitness-online/
+
 ## 基准测试：求解器剪枝优化
 
 该基准比较了 **baseline 求解器（无剪枝）** 与 **剪枝求解器（启用分支剪枝）** 在各种谜题配置下的表现。
