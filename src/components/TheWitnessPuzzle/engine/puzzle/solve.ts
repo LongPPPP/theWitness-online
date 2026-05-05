@@ -167,7 +167,7 @@ export default class PuzzleSolver {
 		const earlyExitData: EarlyExitData = [false, {'isEdge': false}, {'isEdge': false}];
 
 
-		// 剪枝优化——一旦分割出一个区域就尝试提前退出
+		// 剪枝优化：一旦分割出一个区域就尝试提前退出
 		// 以这条路径为例（道路轨迹为 X-X-X-A-B-C）
 		// ....X....
 		// . . X . .
@@ -178,10 +178,11 @@ export default class PuzzleSolver {
 		// 注意：到达 B 时，谜题已被分成两半，但此时仍可向左或向右移动
 		// 因此无法确定哪个区域可以被检验
 		// 而到达 C 时，右侧区域已被封闭
-		// 此时就可以从 A 的右侧单元格开始执行泛洪填充，该单元格通过 A+(B-C) 计算得出
+		// 此时就可以从 A 的右侧单元格开始执行洪水填充，该单元格通过 A+(B-C) 计算得出
 		//
 		// 该优化对带柱子的谜题无效，因为两个区域仍然连通
 		// 此外，该优化在启用自定义机制时也不适用，因为许多自定义机制依赖于遍历整个谜题的路径
+		// 同时，若当前区域没有终点，也要剪枝
 		this.doPruning = (puzzle.pillar === false && !puzzle.settings.CUSTOM_MECHANICS)
 
 		// const self = this;
