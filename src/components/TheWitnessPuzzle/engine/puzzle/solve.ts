@@ -167,29 +167,21 @@ export default class PuzzleSolver {
 		const earlyExitData: EarlyExitData = [false, {'isEdge': false}, {'isEdge': false}];
 
 
-		// Large pruning optimization -- Attempt to early exit once we cut out a region.
-		// Inspired by https://github.com/Overv/TheWitnessSolver
-		// For non-pillar puzzles, every time we draw a line from one edge to another, we cut out two regions.
-		// We can detect this by asking if we've ever left an edge, and determining if we've just touched an edge.
-		// However, just touching the edge isn't sufficient, since we could still enter either region.
-		// As such, we wait one additional step, to see which half we have moved in to, then we evaluate
-		// whichever half you moved away from (since you can no longer re-enter it).
-		//
-		// Consider this pathway (tracing X-X-X-A-B-C).
+		// 剪枝优化——一旦分割出一个区域就尝试提前退出
+		// 以这条路径为例（道路轨迹为 X-X-X-A-B-C）
 		// ....X....
 		// . . X . .
 		// ....X....
 		// . . A . .
 		// ...CB....
 		//
-		// Note that, once we have reached B, the puzzle is divided in half. However, we could go either
-		// left or right -- so we don't know which region is safe to validate.
-		// Once we reach C, however, the region to the right is closed off.
-		// As such, we can start a flood fill from the cell to the right of A, computed by A+(C-B).
+		// 注意：到达 B 时，谜题已被分成两半，但此时仍可向左或向右移动
+		// 因此无法确定哪个区域可以被检验
+		// 而到达 C 时，右侧区域已被封闭
+		// 此时就可以从 A 的右侧单元格开始执行泛洪填充，该单元格通过 A+(B-C) 计算得出
 		//
-		// Unfortunately, this optimization doesn't work for pillars, since the two regions are still connected.
-		// Additionally, this optimization doesn't work when custom mechanics are active, as many custom mechanics
-		// depend on the path through the entire puzzle
+		// 该优化对带柱子的谜题无效，因为两个区域仍然连通
+		// 此外，该优化在启用自定义机制时也不适用，因为许多自定义机制依赖于遍历整个谜题的路径
 		this.doPruning = (puzzle.pillar === false && !puzzle.settings.CUSTOM_MECHANICS)
 
 		// const self = this;
@@ -323,16 +315,17 @@ export default class PuzzleSolver {
 			if (numEndpoints === 0) return this.tailRecurse(x, y)
 		}
 
+		// 我们需要4个属性去判断封闭区域
 		let newEarlyExitData = null;
 		if (this.doPruning) {
 			const isEdge = x <= 0 || y <= 0 || x >= puzzle.width - 1 || y >= puzzle.height - 1;
-			newEarlyExitData = [
-				earlyExitData[0] || (!isEdge && earlyExitData[2].isEdge), // Have we ever left an edge?
-				earlyExitData[2],                                         // The position before our current one
-				{'x': x, 'y': y, 'isEdge': isEdge}                           // Our current position.
+			newEarlyExitData = [																					 // 走到下一个点的时候，使用他作为剪枝的依据
+				earlyExitData[0] || (!isEdge && earlyExitData[2].isEdge),    // 更新是否离开过边界?
+				earlyExitData[2],                                            // 前一个点（此时）
+				{'x': x, 'y': y, 'isEdge': isEdge}                           // 当前点（此时）
 			]
+			// 1.曾今离开过边界 && 2.往前数第二个点不在边界上 && 3.往前数第一个点在边界上 && 4.当前点在边界上
 			if (earlyExitData[0] && !earlyExitData[1].isEdge && earlyExitData[2].isEdge && isEdge) {
-				// See the above comment for an explanation of this math.
 				const floodX = earlyExitData[2].x + (earlyExitData[1].x - x);
 				const floodY = earlyExitData[2].y + (earlyExitData[1].y - y)
 				const region = puzzle.getRegion(floodX, floodY)
@@ -340,8 +333,7 @@ export default class PuzzleSolver {
 					const regionData = validateRegion(puzzle, region, true);
 					if (!regionData.valid()) return this.tailRecurse(x, y)
 
-					// Additionally, we might have left an endpoint in the enclosed region.
-					// If so, we should decrement the number of remaining endpoints (and possibly tail recurse).
+					// 若不可达的封闭区域中有终点，要减去，如果总的终点-封闭区域中有终点 == 0 意味这么走着一定无解。
 					for (const pos of region) {
 						const endCell = puzzle.getLineCell(pos.x, pos.y);
 						if (endCell != null && endCell.end != null) numEndpoints--
